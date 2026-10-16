@@ -54,7 +54,8 @@ button { cursor: pointer; }
 
 /* ---------- app frame ---------- */
 .app { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: 1fr; }
-@media (min-width: 900px) { .app { grid-template-columns: var(--side-w, 280px) 24px minmax(0, 1fr); gap: 20px; padding-left: max(40px, env(safe-area-inset-left, 0px)); padding-right: max(40px, env(safe-area-inset-right, 0px)); } }
+/* desktop: pinned to the left edge with a slim margin; the list column takes the rest, up to a readable width */
+@media (min-width: 900px) { .app { max-width: none; margin: 0; grid-template-columns: var(--side-w, 280px) 24px minmax(0, 1240px); gap: 20px; padding-left: max(28px, env(safe-area-inset-left, 0px)); padding-right: max(40px, env(safe-area-inset-right, 0px)); } }
 
 .side { display: none; }
 @media (min-width: 900px) {
