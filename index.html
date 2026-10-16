@@ -1,0 +1,1338 @@
+<!doctype html>
+<html lang="zh-Hant">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>工作待辦清單</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Noto+Sans+TC:wght@400;500;700&family=Imbue:opsz,wght@10..100,300..600&display=swap">
+<style>
+/* Layout: Japanese editorial — paper-grey ground, ink type, hairlines ending in dots.
+   Desktop ≥ 900px: sticky left column (brand, lists, nav, calendar, account) + work column.
+   Phone: single column, bottom tab bar, editor as bottom sheet. */
+:root {
+  --bg: #f0f0ee; --paper: #f7f7f5; --fg: #111111; --muted: #6d6d68; --line: #c8c8c2; --soft: #e4e4e0;
+  --warn: #9b2c1f; --shadow: 0 16px 40px rgba(0, 0, 0, .14);
+  --f-body: "Noto Sans TC", "PingFang TC", "Microsoft JhengHei", system-ui, sans-serif;
+  --f-latin: "Imbue", "Noto Sans TC", serif;
+  --c1: #33567f; --c2: #3f7353; --c3: #9a6224; --c4: #6a4c86; --c5: #a3392b; --c6: #2f7d80;
+  color-scheme: light;
+}
+@media (prefers-color-scheme: dark) { :root {
+  --bg: #151514; --paper: #1d1d1b; --fg: #ecebe6; --muted: #9c9b94; --line: #3a3a36; --soft: #262624;
+  --warn: #e0806f; --shadow: 0 16px 40px rgba(0, 0, 0, .55); color-scheme: dark;
+  --c1: #8fb2dc; --c2: #8cc4a0; --c3: #dba76b; --c4: #b9a0d6; --c5: #e8907f; --c6: #7fc6c8;
+} }
+[hidden] { display: none !important; }
+* { box-sizing: border-box; }
+html, body { margin: 0; }
+body { background: var(--bg); color: var(--fg); font-family: var(--f-body); font-size: 15px; line-height: 1.75; letter-spacing: .03em; font-variant-numeric: tabular-nums; padding-top: env(safe-area-inset-top, 0px); }
+button, input, textarea, select { font: inherit; color: inherit; letter-spacing: inherit; }
+button { cursor: pointer; }
+:focus-visible { outline: 1px solid var(--fg); outline-offset: 3px; }
+
+.rule { position: relative; height: 1px; background: var(--fg); margin-inline: 3px; }
+.rule::before, .rule::after { content: ""; position: absolute; top: -2.5px; width: 6px; height: 6px; border-radius: 50%; background: var(--fg); }
+.rule::before { left: -3px; } .rule::after { right: -3px; }
+
+.pill { display: inline-flex; align-items: center; gap: 14px; border: 0; background: var(--fg); color: var(--bg); border-radius: 999px; padding: 10px 22px; font-size: 14px; font-weight: 500; white-space: nowrap; }
+.pill .ar { position: relative; width: 30px; height: 1px; background: currentColor; flex: none; }
+.pill .ar::after { content: ""; position: absolute; right: 0; top: -3px; width: 7px; height: 1px; background: currentColor; transform: rotate(35deg); transform-origin: right center; }
+.pill:disabled { opacity: .5; cursor: default; }
+@media (prefers-reduced-motion: no-preference) { .pill .ar { transition: width .2s; } .pill:hover .ar { width: 40px; } }
+
+/* ---------- sign-in ---------- */
+.gate { min-height: 100vh; display: grid; place-items: center; padding: 40px max(16px, env(safe-area-inset-right, 0px)) 40px max(16px, env(safe-area-inset-left, 0px)); }
+.gate-box { width: 100%; max-width: 420px; display: flex; flex-direction: column; gap: 20px; }
+.gate .en { font-family: var(--f-latin); font-size: 72px; line-height: .9; font-weight: 500; font-variation-settings: "opsz" 100; }
+.gate h1 { font-size: 20px; margin: 0; letter-spacing: .1em; }
+.gate p { margin: 0; color: var(--muted); font-size: 14px; }
+.gate form { display: flex; flex-direction: column; gap: 14px; }
+.gate input { border: 0; border-bottom: 1px solid var(--fg); background: transparent; padding: 10px 2px; font-size: 16px; border-radius: 0; }
+.gate .msg { font-size: 14px; color: var(--fg); }
+.gate .msg.err { color: var(--warn); }
+
+/* ---------- app frame ---------- */
+.app { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: 1fr; }
+@media (min-width: 900px) { .app { grid-template-columns: 280px minmax(0, 1fr); gap: 64px; padding-left: max(40px, env(safe-area-inset-left, 0px)); padding-right: max(40px, env(safe-area-inset-right, 0px)); } }
+
+.side { display: none; }
+@media (min-width: 900px) {
+  .side { display: flex; flex-direction: column; gap: 26px; position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding-block: 40px 32px; }
+}
+.brand .en { display: block; font-family: var(--f-latin); font-size: 64px; line-height: .9; font-weight: 500; font-variation-settings: "opsz" 100; letter-spacing: -.01em; }
+.brand .zh { display: block; font-size: 13px; margin-top: 8px; letter-spacing: .2em; }
+.now { display: flex; align-items: baseline; gap: 10px; }
+.now .big { font-family: var(--f-latin); font-size: 38px; line-height: 1; }
+.now .sub { font-size: 12px; color: var(--muted); }
+.nav { display: flex; flex-direction: column; gap: 2px; }
+.nav .lbl, .side-cats .lbl, .acct .lbl { font-size: 11px; color: var(--muted); letter-spacing: .16em; margin-bottom: 4px; }
+.nav button { display: flex; align-items: center; gap: 12px; border: 0; background: none; padding: 5px 0; text-align: left; font-size: 15px; color: var(--muted); }
+.nav button::before { content: ""; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; flex: none; }
+.nav button[aria-pressed="true"] { color: var(--fg); font-weight: 700; }
+.nav button[aria-pressed="true"]::before { background: currentColor; }
+.nav button .en { font-family: var(--f-latin); font-size: 13px; color: var(--muted); font-weight: 400; margin-left: auto; letter-spacing: .04em; }
+
+.cal-head { display: flex; align-items: center; justify-content: space-between; margin-bottom: 8px; }
+.cal-head .m { font-family: var(--f-latin); font-size: 22px; }
+.cal-head button { border: 0; background: none; width: 30px; height: 30px; font-size: 18px; color: var(--muted); }
+.cal-grid { display: grid; grid-template-columns: repeat(7, 1fr); gap: 2px; text-align: center; }
+.cal-grid .wd { font-size: 11px; color: var(--muted); padding-bottom: 4px; }
+.cal-grid button { position: relative; border: 0; background: none; aspect-ratio: 1; max-width: 100%; border-radius: 50%; font-family: var(--f-latin); font-size: 15px; display: grid; place-items: center; padding: 0; }
+.cal-grid button.out { color: var(--muted); opacity: .45; }
+.cal-grid button.has::after { content: ""; position: absolute; bottom: 4px; left: 50%; width: 4px; height: 4px; margin-left: -2px; border-radius: 50%; background: currentColor; }
+.cal-grid button.is-today { box-shadow: inset 0 0 0 1px var(--fg); }
+.cal-grid button.sel { background: var(--fg); color: var(--bg); }
+.cal-grid button:hover:not(.sel) { background: var(--soft); }
+.acct { display: flex; flex-direction: column; gap: 4px; font-size: 13px; }
+.acct .who { font-weight: 500; overflow-wrap: anywhere; }
+.acct .links-row { display: flex; flex-wrap: wrap; gap: 4px 14px; }
+.text-link { border: 0; background: none; padding: 0; font-size: 13px; color: var(--muted); text-decoration: underline; text-underline-offset: 4px; }
+.text-link:hover { color: var(--fg); }
+.status { font-size: 12px; color: var(--muted); display: flex; align-items: center; gap: 8px; }
+.status::before { content: ""; width: 6px; height: 6px; border-radius: 50%; background: currentColor; }
+
+.main { min-width: 0; padding-block: 0 120px; }
+@media (min-width: 900px) { .main { padding-block: 40px 96px; } }
+.mbar { position: sticky; top: 0; z-index: 5; background: var(--bg); display: flex; align-items: center; justify-content: space-between; gap: 12px; padding-block: 14px 10px; }
+.mbar .logo { font-family: var(--f-latin); font-size: 30px; line-height: 1; font-weight: 500; }
+.mbar .d { font-size: 12px; color: var(--muted); text-align: right; }
+@media (min-width: 900px) { .mbar { display: none; } }
+
+/* list switch (personal / team) */
+.scope { display: inline-flex; border: 1px solid var(--fg); border-radius: 999px; padding: 3px; gap: 2px; }
+.scope button { border: 0; background: none; border-radius: 999px; padding: 5px 16px; font-size: 14px; color: var(--muted); }
+.scope button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
+.scope-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
+@media (min-width: 900px) { .scope-row { margin-top: 0; } }
+.scope-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
+
+.hero { display: flex; align-items: flex-end; gap: 18px; padding-block: 24px 20px; }
+.hero .en { font-family: var(--f-latin); font-size: clamp(54px, 13vw, 104px); line-height: .82; font-weight: 400; font-variation-settings: "opsz" 100; letter-spacing: -.01em; margin: 0; }
+.hero .vert { writing-mode: vertical-rl; font-size: 13px; letter-spacing: .3em; padding-bottom: 4px; }
+.hero .meta { margin-left: auto; text-align: right; font-size: 13px; color: var(--muted); padding-bottom: 6px; }
+.hero .meta strong { font-size: 15px; color: var(--fg); font-weight: 500; }
+.dayhero { display: flex; align-items: flex-end; gap: 14px; flex-wrap: wrap; }
+.circle-btn { width: 40px; height: 40px; border-radius: 50%; border: 1px solid var(--fg); background: none; font-size: 17px; display: grid; place-items: center; }
+.circle-btn:hover { background: var(--fg); color: var(--bg); }
+.all-btn { border: 0; background: none; padding: 0; font: inherit; color: inherit; letter-spacing: inherit; line-height: inherit; text-decoration: underline transparent; text-decoration-thickness: 2px; text-underline-offset: 10px; }
+.all-btn:hover, .all-btn[aria-pressed="true"] { text-decoration-color: currentColor; }
+
+form.quick { display: grid; grid-template-columns: 1fr auto auto auto; gap: 10px; align-items: center; margin-top: 22px; }
+.quick input, select.sel { min-width: 0; border: 0; border-bottom: 1px solid var(--fg); background: transparent; padding: 10px 2px; border-radius: 0; }
+select.sel { font-size: 14px; }
+select.sel option { background: var(--paper); color: var(--fg); }
+.quick input::placeholder { color: var(--muted); }
+.quick input[type=date] { font-family: var(--f-latin); font-size: 16px; }
+@media (max-width: 640px) { form.quick { grid-template-columns: minmax(0, 1fr) minmax(0, 1fr) auto; } form.quick input[type=text] { grid-column: 1 / -1; } }
+
+.filters { display: flex; gap: 18px; flex-wrap: wrap; align-items: center; margin-top: 22px; }
+.tab-f { border: 0; background: none; padding: 4px 0; font-size: 14px; color: var(--muted); border-bottom: 1px solid transparent; }
+.tab-f[aria-pressed="true"] { color: var(--fg); border-bottom-color: var(--fg); }
+.search { flex: 1 1 180px; min-width: 0; border: 1px solid var(--line); background: var(--paper); border-radius: 999px; padding: 6px 16px; font-size: 13px; }
+
+.week { display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; margin-top: 18px; }
+@media (min-width: 900px) { .week { display: none; } }
+.week button { border: 0; background: none; padding: 6px 0 4px; display: flex; flex-direction: column; align-items: center; border-radius: 999px; min-width: 0; }
+.week .wd { font-size: 11px; color: var(--muted); }
+.week .dn { font-family: var(--f-latin); font-size: 20px; line-height: 1.2; }
+.week .ct { width: 4px; height: 4px; border-radius: 50%; margin-top: 2px; }
+.week .has .ct { background: currentColor; }
+.week button.is-today .dn { text-decoration: underline; text-underline-offset: 3px; text-decoration-thickness: 1px; }
+.week button.sel { background: var(--fg); color: var(--bg); }
+.week button.sel .wd { color: var(--bg); }
+.drag-hint { font-size: 12px; color: var(--muted); margin: 18px 0 0; }
+
+section.group { margin-top: 40px; }
+.group-h { display: flex; align-items: baseline; gap: 12px; margin: 0 0 10px; font-weight: 400; }
+.group-h .num { font-family: var(--f-latin); font-size: 34px; line-height: 1; }
+.group-h .zh { font-size: 14px; font-weight: 700; letter-spacing: .1em; }
+.group-h .zh:first-child { font-size: 18px; }
+.group-h .sub { font-size: 12px; color: var(--muted); }
+.group-h .n { margin-left: auto; font-family: var(--f-latin); font-size: 16px; color: var(--muted); }
+.group.overdue .group-h { color: var(--warn); }
+.group.overdue .rule, .group.overdue .rule::before, .group.overdue .rule::after { background: var(--warn); }
+ul.tasks { list-style: none; margin: 0; padding: 0; }
+li.task { display: grid; grid-template-columns: auto auto 1fr; gap: 10px; padding: 16px 4px 16px 0; border-bottom: 1px solid var(--line); position: relative; }
+.grip { border: 0; background: transparent; color: var(--muted); width: 26px; height: 30px; margin-top: -3px; border-radius: 4px; cursor: grab; touch-action: none; font-size: 15px; line-height: 1; letter-spacing: -3px; user-select: none; }
+.grip:hover, .grip:focus-visible { color: var(--fg); background: var(--soft); }
+.check { appearance: none; width: 22px; height: 22px; border: 1px solid var(--fg); border-radius: 50%; margin: 1px 0 0; cursor: pointer; display: grid; place-items: center; background: transparent; }
+.check:checked { background: var(--fg); }
+.check:checked::after { content: ""; width: 5px; height: 10px; border: solid var(--bg); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg) translate(-1px, -1px); }
+.body { min-width: 0; display: flex; flex-direction: column; gap: 6px; }
+.t-title { font-size: 16px; font-weight: 500; overflow-wrap: anywhere; background: none; border: 0; padding: 0; text-align: left; line-height: 1.6; align-self: flex-start; }
+.t-title:hover { text-decoration: underline; text-underline-offset: 5px; text-decoration-thickness: 1px; }
+li.task.done .t-title { text-decoration: line-through; color: var(--muted); }
+.t-meta { display: flex; flex-wrap: wrap; align-items: center; gap: 2px 16px; font-size: 12px; color: var(--muted); margin-top: -2px; }
+.due { font-family: var(--f-latin); font-size: 13px; letter-spacing: .02em; }
+.due.late { color: var(--warn); }
+.who-tag { display: inline-flex; align-items: center; gap: 5px; }
+.who-tag::before { content: ""; width: 14px; height: 14px; border-radius: 50%; border: 1px solid currentColor; background: radial-gradient(circle at 50% 38%, currentColor 0 2.5px, transparent 3px), radial-gradient(ellipse at 50% 105%, currentColor 0 5px, transparent 5.5px); flex: none; }
+.who-tag.mine { color: var(--fg); font-weight: 500; }
+.link-toggle { display: inline-flex; align-items: center; gap: 5px; border: 0; background: none; padding: 2px 0; font-size: 12px; color: var(--muted); }
+.link-toggle:hover, .link-toggle[aria-expanded="true"] { color: var(--fg); }
+.note { font-size: 13px; color: var(--muted); white-space: pre-wrap; overflow-wrap: anywhere; line-height: 1.8; cursor: pointer; display: -webkit-box; -webkit-box-orient: vertical; -webkit-line-clamp: 1; overflow: hidden; }
+.note.open { display: block; }
+@media (hover: hover) and (pointer: fine) {
+  li.task .grip, li.task .sub-add { opacity: 0; }
+  li.task:hover .grip, li.task:focus-within .grip, li.task:hover .sub-add, li.task:focus-within .sub-add { opacity: 1; }
+}
+.done-toggle { display: flex; align-items: center; gap: 10px; margin-top: 32px; border: 0; background: none; padding: 6px 0; font-size: 14px; color: var(--muted); }
+.done-toggle::before { content: ""; width: 7px; height: 7px; border-radius: 50%; border: 1px solid currentColor; }
+.done-toggle[aria-expanded="true"]::before { background: currentColor; }
+.links { display: flex; flex-wrap: wrap; gap: 4px 18px; }
+a.link { display: inline-flex; align-items: baseline; gap: 8px; max-width: 100%; font-size: 13px; color: var(--fg); text-decoration: none; }
+a.link .k { font-family: var(--f-latin); font-size: 12px; color: var(--muted); letter-spacing: .08em; flex: none; }
+a.link .lt { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+a.link::after { content: "↗"; font-size: 12px; color: var(--muted); }
+.sub-prog { font-size: 12px; color: var(--muted); border: 0; background: none; padding: 0; }
+button.sub-prog:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 3px; }
+ul.subs { list-style: none; margin: 2px 0 0; padding: 0; display: flex; flex-direction: column; gap: 3px; }
+ul.subs li { display: flex; align-items: flex-start; gap: 9px; font-size: 14px; line-height: 1.6; }
+ul.subs li label { cursor: pointer; overflow-wrap: anywhere; min-width: 0; }
+ul.subs li.done label { text-decoration: line-through; color: var(--muted); }
+.sub-check { appearance: none; width: 15px; height: 15px; border: 1px solid var(--fg); border-radius: 3px; margin: 4px 0 0; flex: none; display: grid; place-items: center; cursor: pointer; background: transparent; }
+.sub-check:checked { background: var(--fg); }
+.sub-check:checked::after { content: ""; width: 4px; height: 8px; border: solid var(--bg); border-width: 0 1.5px 1.5px 0; transform: rotate(45deg) translate(-1px, -1px); }
+.sub-add { align-self: flex-start; border: 0; background: none; padding: 2px 0; font-size: 12px; color: var(--muted); }
+.sub-add:hover { color: var(--fg); text-decoration: underline; text-underline-offset: 4px; }
+.sub-input { max-width: 420px; border: 0; border-bottom: 1px solid var(--fg); background: transparent; padding: 4px 2px; font-size: 14px; min-width: 0; border-radius: 0; }
+.sub-edit { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; }
+.sub-edit .sub-check { margin: 0; }
+.sub-edit input.st { border: 0; border-bottom: 1px solid var(--line); background: transparent; padding: 6px 2px; min-width: 0; font-size: 15px; border-radius: 0; }
+
+.dot { display: inline-block; width: 8px; height: 8px; border-radius: 50%; background: var(--cc, var(--muted)); flex: none; }
+.cat-tag { display: inline-flex; align-items: center; gap: 6px; color: var(--cc, var(--muted)); font-weight: 500; }
+.cats { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; margin-top: 16px; }
+.cat-chip { display: inline-flex; align-items: center; gap: 7px; border: 1px solid var(--line); background: transparent; border-radius: 999px; padding: 4px 12px; font-size: 13px; }
+.cat-chip .n { font-family: var(--f-latin); color: var(--muted); }
+.cat-chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.cat-chip[aria-pressed="true"] .n { color: var(--bg); }
+.side-cats { display: flex; flex-direction: column; gap: 2px; }
+.side-cats button { display: flex; align-items: center; gap: 10px; border: 0; background: none; padding: 4px 0; text-align: left; font-size: 14px; color: var(--muted); }
+.side-cats button .n { margin-left: auto; font-family: var(--f-latin); font-size: 13px; }
+.side-cats button[aria-pressed="true"] { color: var(--fg); font-weight: 700; }
+@media (min-width: 900px) { .cats { display: none; } }
+.row-edit { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; padding: 8px 0; border-bottom: 1px solid var(--line); }
+.row-edit input { border: 0; border-bottom: 1px solid transparent; background: transparent; padding: 6px 2px; min-width: 0; font-size: 15px; }
+.row-edit input:focus { border-bottom-color: var(--fg); outline: none; }
+.row-edit .em { font-size: 12px; color: var(--muted); overflow-wrap: anywhere; }
+.swatch { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: transparent; display: grid; place-items: center; padding: 0; }
+.swatch .dot { width: 14px; height: 14px; }
+.new-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; margin-top: 6px; }
+.new-row input { border: 0; border-bottom: 1px solid var(--fg); background: transparent; padding: 8px 2px; min-width: 0; font-size: 15px; border-radius: 0; }
+.mem-new { display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 10px; align-items: center; }
+@media (max-width: 560px) { .mem-new { grid-template-columns: 1fr auto; } .mem-new input[type=email] { grid-column: 1 / -1; } }
+.mem-new input { border: 0; border-bottom: 1px solid var(--fg); background: transparent; padding: 8px 2px; min-width: 0; font-size: 15px; border-radius: 0; }
+
+li.task.dragging { opacity: .3; }
+li.task.drop-before::before, li.task.drop-after::after { content: ""; position: absolute; left: 0; right: 0; height: 2px; background: var(--fg); }
+li.task.drop-before::before { top: -1px; }
+li.task.drop-after::after { bottom: -1px; }
+section.group.drop-into ul.tasks { outline: 1px dashed var(--fg); outline-offset: 4px; }
+[data-dropdate].drop-on { background: var(--fg) !important; color: var(--bg) !important; }
+.ghost { position: fixed; z-index: 30; pointer-events: none; list-style: none; margin: 0; padding-left: 10px !important; background: var(--paper); border: 1px solid var(--fg) !important; border-radius: 4px; box-shadow: var(--shadow); }
+body.is-dragging { user-select: none; cursor: grabbing; }
+
+.empty { margin-top: 40px; padding: 40px 20px; text-align: center; }
+.empty strong { display: block; font-size: 17px; margin-bottom: 4px; }
+.empty p { margin: 0; font-size: 13px; color: var(--muted); }
+.banner { margin-top: 18px; font-size: 13px; padding: 10px 14px; border: 1px solid var(--warn); color: var(--warn); }
+.foot { margin-top: 56px; display: flex; flex-direction: column; gap: 8px; font-size: 13px; color: var(--muted); }
+.foot .links-row { display: flex; flex-wrap: wrap; gap: 6px 16px; }
+@media (min-width: 900px) { .foot { display: none; } }
+
+.toast { position: fixed; left: 50%; transform: translateX(-50%); bottom: calc(84px + env(safe-area-inset-bottom, 0px)); z-index: 50; display: flex; align-items: center; gap: 18px; background: var(--fg); color: var(--bg); border-radius: 999px; padding: 10px 12px 10px 22px; font-size: 14px; box-shadow: var(--shadow); max-width: calc(100vw - 32px); }
+@media (min-width: 900px) { .toast { bottom: 32px; } }
+.toast .tmsg { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.toast button { border: 1px solid var(--bg); background: none; color: var(--bg); border-radius: 999px; padding: 4px 14px; font-size: 13px; flex: none; }
+
+.tabbar { position: fixed; left: 0; right: 0; bottom: 0; z-index: 10; background: var(--bg); border-top: 1px solid var(--fg); display: grid; grid-template-columns: 1fr 1fr auto; align-items: center; gap: 8px; padding: 8px max(16px, env(safe-area-inset-right, 0px)) calc(8px + env(safe-area-inset-bottom, 0px)) max(16px, env(safe-area-inset-left, 0px)); }
+.tabbar button.tb { border: 0; background: none; display: flex; flex-direction: column; align-items: center; padding: 4px 0; color: var(--muted); font-size: 12px; }
+.tabbar button.tb .en { font-family: var(--f-latin); font-size: 20px; line-height: 1.1; }
+.tabbar button.tb[aria-pressed="true"] { color: var(--fg); }
+.tabbar button.tb[aria-pressed="true"] .en { text-decoration: underline; text-underline-offset: 4px; text-decoration-thickness: 1px; }
+.tabbar .pill { padding: 10px 18px; }
+@media (min-width: 900px) { .tabbar { display: none; } }
+
+.overlay { position: fixed; inset: 0; background: rgba(10, 10, 10, .4); z-index: 40; display: flex; align-items: flex-end; justify-content: center; overflow-y: auto; }
+@media (min-width: 640px) { .overlay { align-items: center; padding: 24px; } }
+.dialog { width: 100%; max-width: 580px; max-height: 100%; overflow-y: auto; background: var(--paper); box-shadow: var(--shadow); display: flex; flex-direction: column; gap: 18px; padding: 24px max(20px, env(safe-area-inset-right, 0px)) calc(20px + env(safe-area-inset-bottom, 0px)) max(20px, env(safe-area-inset-left, 0px)); border-radius: 14px 14px 0 0; }
+@media (min-width: 640px) { .dialog { border-radius: 4px; padding: 32px; } }
+.dialog .dh { display: flex; align-items: baseline; gap: 12px; }
+.dialog .dh .en { font-family: var(--f-latin); font-size: 38px; line-height: 1; }
+.dialog h3 { font-size: 15px; margin: 0; letter-spacing: .14em; }
+.x-btn { margin-left: auto; align-self: center; width: 40px; height: 40px; flex: none; border-radius: 50%; border: 1px solid var(--fg); background: transparent; font-size: 22px; line-height: 1; display: grid; place-items: center; padding: 0; }
+.x-btn:hover { background: var(--fg); color: var(--paper); }
+.field { display: flex; flex-direction: column; gap: 4px; }
+.field label, .field .lbl { font-size: 12px; color: var(--muted); letter-spacing: .12em; }
+.field input, .field textarea { border: 0; border-bottom: 1px solid var(--fg); background: transparent; padding: 8px 2px; min-width: 0; width: 100%; border-radius: 0; font-size: 16px; }
+.field textarea { min-height: 72px; resize: vertical; border: 1px solid var(--line); padding: 8px 10px; font-size: 15px; }
+.row2 { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: end; }
+.row-half { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
+@media (max-width: 480px) { .row-half { grid-template-columns: 1fr; } }
+.link-list { display: flex; flex-direction: column; gap: 10px; }
+.link-edit { display: grid; grid-template-columns: 1fr 1.7fr auto; gap: 10px; align-items: end; }
+.link-edit input { font-size: 14px; }
+@media (max-width: 560px) { .link-edit { grid-template-columns: 1fr auto; } .link-edit input.lu { grid-column: 1 / -1; grid-row: 1; } }
+.hint { font-size: 12px; color: var(--muted); margin: 0; }
+.actions { display: flex; gap: 12px; flex-wrap: wrap; align-items: center; }
+.actions .spacer { flex: 1; }
+.btn { border: 1px solid var(--fg); background: transparent; border-radius: 999px; padding: 7px 18px; font-size: 13px; }
+.btn.danger { color: var(--warn); border-color: var(--warn); }
+.btn.danger.armed { background: var(--warn); color: var(--paper); }
+.err { color: var(--warn); font-size: 12px; }
+</style>
+</head>
+<body>
+
+<!-- sign-in -->
+<section class="gate" id="login" hidden>
+  <div class="gate-box">
+    <span class="en">Tasks</span>
+    <div class="rule"></div>
+    <h1>登入工作待辦清單</h1>
+    <p>輸入你的公司 Email，我們會寄一封登入信給你。點信裡的連結就會回到這裡並完成登入，不需要密碼。</p>
+    <form id="loginForm" autocomplete="on">
+      <input type="email" id="loginEmail" required placeholder="name@weddings.tw" aria-label="Email" autocomplete="email">
+      <div><button type="submit" class="pill" id="loginBtn">寄登入信<span class="ar"></span></button></div>
+    </form>
+    <div class="msg" id="loginMsg" hidden></div>
+  </div>
+</section>
+
+<section class="gate" id="denied" hidden>
+  <div class="gate-box">
+    <span class="en">Tasks</span>
+    <div class="rule"></div>
+    <h1>這個帳號還沒加入團隊</h1>
+    <p id="deniedText"></p>
+    <div><button type="button" class="pill" data-signout>換一個 Email 登入<span class="ar"></span></button></div>
+  </div>
+</section>
+
+<section class="gate" id="loading">
+  <div class="gate-box"><span class="en">Tasks</span><p>載入中…</p></div>
+</section>
+
+<div id="appRoot" hidden>
+<div class="app">
+  <aside class="side" aria-label="導覽">
+    <div class="brand"><span class="en">Tasks</span><span class="zh">工作待辦清單</span></div>
+    <div class="rule"></div>
+    <div class="now"><span class="big" id="nowDate"></span><span class="sub" id="nowSub"></span></div>
+    <nav class="nav">
+      <span class="lbl">檢視</span>
+      <button type="button" data-view="all" aria-pressed="true">全部待辦<span class="en">All</span></button>
+      <button type="button" data-view="day" aria-pressed="false">每日檢視<span class="en">Daily</span></button>
+    </nav>
+    <div><button type="button" class="pill" data-new>新增待辦<span class="ar"></span></button></div>
+    <div class="side-cats" id="sideCats"></div>
+    <div class="cal">
+      <div class="cal-head">
+        <button type="button" id="calPrev" aria-label="上個月">‹</button>
+        <span class="m" id="calMonth"></span>
+        <button type="button" id="calNext" aria-label="下個月">›</button>
+      </div>
+      <div class="cal-grid" id="calGrid"></div>
+    </div>
+    <div class="acct">
+      <span class="lbl">帳號</span>
+      <span class="who" data-who></span>
+      <div class="links-row">
+        <button type="button" class="text-link" data-export>匯出 CSV</button>
+        <button type="button" class="text-link" data-members hidden>成員管理</button>
+        <button type="button" class="text-link" data-signout>登出</button>
+      </div>
+    </div>
+    <span class="status" data-status>已同步</span>
+  </aside>
+
+  <main class="main">
+    <div class="mbar">
+      <span class="logo">Tasks</span>
+      <span class="d"><span id="mDate"></span><br><span data-status>已同步</span></span>
+    </div>
+
+    <div class="scope-row">
+      <div class="scope" role="group" aria-label="清單">
+        <button type="button" data-scope="personal" aria-pressed="true">我的清單</button>
+        <button type="button" data-scope="team" aria-pressed="false">團隊清單</button>
+      </div>
+      <div class="scope-tools">
+        <span class="hint" id="scopeHint"></span>
+        <button type="button" class="btn" data-export title="下載目前所有待辦（Excel 可開啟）">匯出 CSV ↓</button>
+      </div>
+    </div>
+
+    <div id="allHead">
+      <div class="hero">
+        <h1 class="en"><button type="button" class="all-btn" id="allBtn" aria-pressed="false" title="顯示全部事項（含已完成）">All</button></h1>
+        <span class="vert" id="allVert">我的待辦</span>
+        <div class="meta">剩下 <strong id="openCount"></strong> 項待辦</div>
+      </div>
+      <div class="rule"></div>
+    </div>
+
+    <div id="dayHead" hidden>
+      <div class="hero dayhero">
+        <h1 class="en" id="dayNum"></h1>
+        <span class="vert" id="dayWd"></span>
+        <div class="meta"><strong id="dayRel" style="display:block"></strong><button type="button" class="text-link" id="goToday">回到今天</button></div>
+      </div>
+      <div class="dayhero" style="justify-content: space-between; align-items: center; margin-bottom: 14px;">
+        <div style="display:flex; gap:6px">
+          <button type="button" class="circle-btn" id="prevDay" aria-label="前一天">‹</button>
+          <button type="button" class="circle-btn" id="nextDay" aria-label="後一天">›</button>
+        </div>
+        <input type="date" class="search" style="flex:0 0 auto; font-family: var(--f-latin); font-size: 15px;" id="dayPick" aria-label="選擇日期">
+      </div>
+      <div class="rule"></div>
+      <div class="week" id="week"></div>
+    </div>
+
+    <div id="banner" class="banner" hidden></div>
+
+    <form class="quick" id="quick" autocomplete="off">
+      <input type="text" id="qTitle" placeholder="快速新增：輸入工作內容後按 Enter" aria-label="工作內容">
+      <select class="sel" id="qCat" aria-label="分類"></select>
+      <input type="date" id="qDate" aria-label="日期">
+      <button type="submit" class="pill">加入<span class="ar"></span></button>
+    </form>
+
+    <div class="cats" id="catBar"></div>
+
+    <div id="allBar" class="filters">
+      <button type="button" class="tab-f" data-f="open" aria-pressed="true">未完成</button>
+      <button type="button" class="tab-f" data-f="done" aria-pressed="false">已完成</button>
+      <button type="button" class="tab-f" data-f="mine" aria-pressed="false" id="mineTab" hidden>我負責的</button>
+      <input class="search" id="search" type="search" placeholder="搜尋標題、備註、連結" aria-label="搜尋">
+    </div>
+
+    <p class="drag-hint" id="dragHint" hidden>小提示：按住事項左側的 ⋮⋮ 拖曳，可調整順序或換到其他日期。<button type="button" class="text-link" id="hintOk">知道了</button></p>
+    <div id="list"></div>
+
+    <div class="foot">
+      <span data-who></span>
+      <div class="links-row">
+        <button type="button" class="text-link" data-export>匯出 CSV</button>
+        <button type="button" class="text-link" data-members hidden>成員管理</button>
+        <button type="button" class="text-link" data-signout>登出</button>
+      </div>
+    </div>
+  </main>
+</div>
+
+<nav class="tabbar" aria-label="檢視切換">
+  <button type="button" class="tb" data-view="all" aria-pressed="true"><span class="en">All</span>全部</button>
+  <button type="button" class="tb" data-view="day" aria-pressed="false"><span class="en">Daily</span>每日</button>
+  <button type="button" class="pill" data-new>新增<span class="ar"></span></button>
+</nav>
+</div>
+
+<div class="toast" id="toast" hidden role="status"><span class="tmsg" id="toastMsg"></span><button type="button" id="toastUndo">復原</button></div>
+
+<!-- task editor -->
+<div class="overlay" id="overlay" hidden>
+  <form class="dialog" id="editor" autocomplete="off" role="dialog" aria-modal="true" aria-labelledby="edHead">
+    <div class="dh"><span class="en" id="edEn">New</span><h3 id="edHead">新增待辦</h3><button type="button" class="x-btn" id="edClose" aria-label="關閉編輯">×</button></div>
+    <div class="rule"></div>
+    <div class="field">
+      <label for="edTitle">工作內容</label>
+      <input id="edTitle" type="text" required>
+    </div>
+    <div class="row-half">
+      <div class="field">
+        <label for="edScope">放在哪個清單</label>
+        <select class="sel" id="edScope"><option value="personal">我的清單（只有我看得到）</option><option value="team">團隊清單（大家都看得到）</option></select>
+      </div>
+      <div class="field" id="edAssigneeField">
+        <label for="edAssignee">負責人</label>
+        <select class="sel" id="edAssignee"></select>
+      </div>
+    </div>
+    <div class="row2">
+      <div class="field">
+        <label for="edDate">日期</label>
+        <input id="edDate" type="date" style="font-family: var(--f-latin)">
+      </div>
+      <button type="button" class="btn" id="edNoDate">不排日期</button>
+    </div>
+    <div class="field">
+      <label for="edCat">分類</label>
+      <select class="sel" id="edCat"></select>
+    </div>
+    <div class="field">
+      <label for="edNote">備註</label>
+      <textarea id="edNote" placeholder="細節、聯絡人、注意事項"></textarea>
+    </div>
+    <div class="field">
+      <span class="lbl">子事項</span>
+      <div class="link-list" id="edSubs"></div>
+      <div class="actions" style="margin-top:8px"><button type="button" class="btn" id="edAddSub">＋ 加一個子事項</button></div>
+    </div>
+    <div class="field">
+      <span class="lbl">雲端連結</span>
+      <div class="link-list" id="edLinks"></div>
+      <div class="actions" style="margin-top:8px"><button type="button" class="btn" id="edAddLink">＋ 加一個連結</button>
+        <span class="hint">可貼 Google 雲端、Dropbox、OneDrive 等網址，名稱可留空</span></div>
+    </div>
+    <div class="err" id="edErr" hidden></div>
+    <div class="actions">
+      <button type="button" class="btn danger" id="edDelete" hidden>刪除</button>
+      <span class="spacer"></span>
+      <button type="button" class="btn" id="edCancel">取消</button>
+      <button type="submit" class="pill">儲存<span class="ar"></span></button>
+    </div>
+  </form>
+</div>
+
+<!-- categories -->
+<div class="overlay" id="catOverlay" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="catHead">
+    <div class="dh"><span class="en">Category</span><h3 id="catHead">管理分類</h3><button type="button" class="x-btn" id="catX" aria-label="關閉">×</button></div>
+    <div class="rule"></div>
+    <div id="catList"></div>
+    <form class="new-row" id="catNew" autocomplete="off">
+      <button type="button" class="swatch" id="catNewColor" aria-label="換顏色"><span class="dot"></span></button>
+      <input type="text" id="catNewName" placeholder="新分類名稱，例如：客戶、會議、行政" aria-label="新分類名稱">
+      <button type="submit" class="pill">新增<span class="ar"></span></button>
+    </form>
+    <p class="hint">分類是全團隊共用的。點圓點可換顏色，直接改名稱即可儲存。刪除分類後，原本的待辦會變成「未分類」。</p>
+  </div>
+</div>
+
+<!-- members -->
+<div class="overlay" id="memOverlay" hidden>
+  <div class="dialog" role="dialog" aria-modal="true" aria-labelledby="memHead">
+    <div class="dh"><span class="en">Team</span><h3 id="memHead">成員管理</h3><button type="button" class="x-btn" id="memX" aria-label="關閉">×</button></div>
+    <div class="rule"></div>
+    <div id="memList"></div>
+    <form class="mem-new" id="memNew" autocomplete="off">
+      <input type="email" id="memEmail" placeholder="同事的 Email" aria-label="同事的 Email" required>
+      <input type="text" id="memName" placeholder="顯示名稱" aria-label="顯示名稱">
+      <button type="submit" class="pill">加入<span class="ar"></span></button>
+    </form>
+    <div class="err" id="memErr" hidden></div>
+    <p class="hint">加入後，把這個網站的網址傳給同事，請他用這個 Email 登入即可。只有名單上的 Email 能看到資料。</p>
+  </div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2.45.4/dist/umd/supabase.js"></script>
+<script>
+(() => {
+  // Public project address and anon key. Safe to ship: every table is locked by row-level security.
+  const SUPABASE_URL = "https://vihwztrfhokqpvsuyszt.supabase.co";
+  const SUPABASE_ANON_KEY = "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InZpaHd6dHJmaG9rcXB2c3V5c3p0Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTIxMzAwOTIsImV4cCI6MjEwNzcwNjA5Mn0.ZkNdv3DvbedXL-BOHPv_Sj2Ezx38dUFqnsJUIwPM8io";
+  const sb = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY, { auth: { flowType: "implicit", persistSession: true, detectSessionInUrl: true } });
+
+  const $ = (id) => document.getElementById(id);
+  const $$ = (sel) => document.querySelectorAll(sel);
+  const WD = ["日", "一", "二", "三", "四", "五", "六"];
+  const pad = (n) => String(n).padStart(2, "0");
+  const ymd = (d) => d.getFullYear() + "-" + pad(d.getMonth() + 1) + "-" + pad(d.getDate());
+  const parse = (s) => { const [y, m, d] = s.split("-").map(Number); return new Date(y, m - 1, d); };
+  const addDays = (s, n) => { const d = parse(s); d.setDate(d.getDate() + n); return ymd(d); };
+  const today = () => ymd(new Date());
+  const dotDate = (s) => { const d = parse(s); return pad(d.getMonth() + 1) + "." + pad(d.getDate()); };
+  const fmtDay = (s) => { const d = parse(s); return (d.getMonth() + 1) + "月" + d.getDate() + "日（週" + WD[d.getDay()] + "）"; };
+  const rel = (s) => { const diff = Math.round((parse(s) - parse(today())) / 86400000);
+    return diff === 0 ? "今天" : diff === 1 ? "明天" : diff === -1 ? "昨天" : diff === 2 ? "後天" : diff < 0 ? (-diff) + " 天前" : diff + " 天後"; };
+  const uuid = () => (crypto.randomUUID ? crypto.randomUUID() : "10000000-1000-4000-8000-100000000000".replace(/[018]/g, (c) => (c ^ (crypto.getRandomValues(new Uint8Array(1))[0] & (15 >> (c / 4)))).toString(16)));
+  function el(tag, cls, text) { const e = document.createElement(tag); if (cls) e.className = cls; if (text != null) e.textContent = text; return e; }
+
+  const COLORS = ["c1", "c2", "c3", "c4", "c5", "c6"];
+  const KEEP_DONE_MS = 14 * 86400000;
+  const state = {
+    me: null, tasks: [], cats: [], members: [],
+    scope: "personal", catFilter: "all", view: "all", filter: "open", q: "",
+    day: today(), cal: today().slice(0, 7), editing: null, focusId: null, addingSub: null,
+    openNotes: new Set(), openSubs: new Set(), openLinks: new Set(), showDoneDay: false,
+  };
+  try {
+    const v = localStorage.getItem("todo.view"); if (v === "day" || v === "all") state.view = v;
+    const s = localStorage.getItem("todo.scope"); if (s === "team" || s === "personal") state.scope = s;
+  } catch (e) {}
+  let hintDismissed = false;
+  try { hintDismissed = localStorage.getItem("todo.hintSeen") === "1"; } catch (e) {}
+  function dismissHint() { hintDismissed = true; $("dragHint").hidden = true; try { localStorage.setItem("todo.hintSeen", "1"); } catch (e) {} }
+
+  // ---------- data mapping ----------
+  const fromRow = (r) => ({
+    id: r.id, scope: r.scope, owner: r.owner_id, assignee: r.assignee_email || "", title: r.title, date: r.date || "",
+    cat: r.cat_id || "", note: r.note || "", links: Array.isArray(r.links) ? r.links : [], subs: Array.isArray(r.subs) ? r.subs : [],
+    done: !!r.done, doneAt: r.done_at ? Date.parse(r.done_at) : null, order: r.sort, createdAt: Date.parse(r.created_at),
+  });
+  const toRow = (t) => ({
+    scope: t.scope, assignee_email: t.scope === "team" && t.assignee ? t.assignee : null, title: t.title, date: t.date || null,
+    cat_id: t.cat || null, note: t.note || "", links: t.links || [], subs: t.subs || [], done: !!t.done,
+    done_at: t.done && t.doneAt ? new Date(t.doneAt).toISOString() : null, sort: ord(t),
+  });
+  const ord = (t) => typeof t.order === "number" ? t.order : (t.createdAt || 0);
+  const byOrd = (a, b) => ord(a) - ord(b);
+  const sortTasks = (a, b) => (a.date || "9999") < (b.date || "9999") ? -1 : (a.date || "9999") > (b.date || "9999") ? 1 : byOrd(a, b);
+  const expired = (t) => t.done && t.doneAt && Date.now() - t.doneAt > KEEP_DONE_MS;
+  const vis = () => state.tasks.filter((t) => t.scope === state.scope && !expired(t));
+  const latest = (t) => state.tasks.find((x) => x.id === t.id) || t;
+  const catOf = (t) => t.cat ? state.cats.find((c) => c.id === t.cat) || null : null;
+  const sortedCats = () => state.cats.slice().sort(byOrd);
+  const safeColor = (k) => COLORS.includes(k) ? k : "c1";
+  const cvar = (c) => "var(--" + safeColor(c && c.color) + ")";
+  const nameOf = (email) => { const m = state.members.find((x) => x.email === email); return m ? (m.name || m.email) : email; };
+  const isAdmin = () => !!state.members.find((m) => m.email === state.me.email && m.is_admin);
+
+  function setStatus(text) { $$("[data-status]").forEach((e) => { e.textContent = text; }); }
+  function showError(e) {
+    const b = $("banner"); b.hidden = false;
+    b.textContent = "儲存失敗：" + ((e && e.message) || "請檢查網路後再試一次。");
+    clearTimeout(showError.t); showError.t = setTimeout(() => { b.hidden = true; }, 8000);
+  }
+
+  // ---------- loading & live updates ----------
+  async function loadAll() {
+    const [t, c, m] = await Promise.all([
+      sb.from("tasks").select("*"),
+      sb.from("categories").select("*"),
+      sb.from("members").select("*"),
+    ]);
+    if (t.error || c.error || m.error) throw (t.error || c.error || m.error);
+    state.tasks = t.data.map(fromRow);
+    state.cats = c.data.map((r) => ({ id: r.id, name: r.name, color: r.color, order: r.sort, createdAt: Date.parse(r.created_at) }));
+    state.members = m.data;
+  }
+  let reloadTimer = null;
+  function scheduleReload() {
+    clearTimeout(reloadTimer);
+    reloadTimer = setTimeout(async () => {
+      try { await loadAll(); setStatus("已同步"); render(); } catch (e) { setStatus("同步中斷，請重新整理"); }
+    }, 250);
+  }
+  let channel = null;
+  function subscribeLive() {
+    if (channel) return;
+    channel = sb.channel("todo-live")
+      .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "members" }, scheduleReload)
+      .subscribe();
+    // also refresh when the page comes back into view (phones pause background tabs)
+    document.addEventListener("visibilitychange", () => { if (!document.hidden) scheduleReload(); });
+  }
+
+  // ---------- writes (optimistic: update the screen first, then the server) ----------
+  async function save(id, data) {
+    const i = state.tasks.findIndex((t) => t.id === id);
+    const isNew = i < 0;
+    const next = { ...data, id, owner: isNew ? state.me.id : state.tasks[i].owner };
+    if (isNew) state.tasks.push(next); else state.tasks[i] = next;
+    render();
+    setStatus("儲存中");
+    const row = toRow(next);
+    const res = isNew ? await sb.from("tasks").insert({ id, ...row }) : await sb.from("tasks").update(row).eq("id", id);
+    if (res.error) { setStatus("已同步"); scheduleReload(); throw res.error; }
+    setStatus("已同步");
+  }
+  async function remove(id) {
+    state.tasks = state.tasks.filter((t) => t.id !== id); render();
+    const res = await sb.from("tasks").delete().eq("id", id);
+    if (res.error) { scheduleReload(); throw res.error; }
+  }
+  async function saveCat(id, data) {
+    const i = state.cats.findIndex((c) => c.id === id);
+    if (i < 0) state.cats.push({ ...data, id }); else state.cats[i] = { ...data, id };
+    render();
+    const row = { name: data.name, color: data.color, sort: ord(data) };
+    const res = i < 0 ? await sb.from("categories").insert({ id, ...row }) : await sb.from("categories").update(row).eq("id", id);
+    if (res.error) { scheduleReload(); throw res.error; }
+  }
+  async function removeCat(id) {
+    state.cats = state.cats.filter((c) => c.id !== id);
+    state.tasks.forEach((t) => { if (t.cat === id) t.cat = ""; });
+    render();
+    const res = await sb.from("categories").delete().eq("id", id);
+    if (res.error) { scheduleReload(); throw res.error; }
+  }
+  const strip = (t) => { const { id, owner, ...rest } = t; return rest; };
+
+  // ---------- undo toast ----------
+  let toastTimer = null, undoFn = null;
+  function toast(msg, undo) {
+    $("toastMsg").textContent = msg; undoFn = undo; $("toast").hidden = false;
+    clearTimeout(toastTimer); toastTimer = setTimeout(() => { $("toast").hidden = true; undoFn = null; }, 6000);
+  }
+  $("toastUndo").addEventListener("click", () => {
+    const f = undoFn; undoFn = null; $("toast").hidden = true;
+    if (f) f().catch(showError);
+  });
+
+  // ---------- rows ----------
+  function matches(t) {
+    if (state.catFilter === "none" && catOf(t)) return false;
+    if (state.catFilter !== "all" && state.catFilter !== "none" && t.cat !== state.catFilter) return false;
+    if (!state.q) return true;
+    const q = state.q.toLowerCase();
+    return [t.title, t.note, nameOf(t.assignee), ...(t.links || []).map((l) => (l.label || "") + " " + l.url), ...(t.subs || []).map((s) => s.text)].join(" ").toLowerCase().includes(q);
+  }
+  function safeUrl(raw) {
+    let s = (raw || "").trim(); if (!s) return null;
+    if (!/^[a-z][a-z0-9+.-]*:/i.test(s)) s = "https://" + s;
+    try { const u = new URL(s); return (u.protocol === "https:" || u.protocol === "http:") ? u.href : null; } catch (e) { return null; }
+  }
+  function kind(url) {
+    let u; try { u = new URL(url); } catch (e) { return ["Link", "連結"]; }
+    const h = u.hostname, p = u.pathname;
+    if (h === "docs.google.com") {
+      if (p.startsWith("/spreadsheets")) return ["Sheet", "Google 試算表"];
+      if (p.startsWith("/presentation")) return ["Slide", "Google 簡報"];
+      if (p.startsWith("/forms")) return ["Form", "Google 表單"];
+      return ["Doc", "Google 文件"];
+    }
+    if (h === "drive.google.com") return ["Drive", "Google 雲端硬碟"];
+    if (h.endsWith("dropbox.com")) return ["Dropbox", "Dropbox"];
+    if (h.endsWith("1drv.ms") || h.endsWith("onedrive.live.com") || h.endsWith("sharepoint.com")) return ["OneDrive", "OneDrive"];
+    if (h.endsWith("icloud.com")) return ["iCloud", "iCloud"];
+    if (h.endsWith("notion.so") || h.endsWith("notion.site")) return ["Notion", "Notion"];
+    if (h.endsWith("figma.com")) return ["Figma", "Figma"];
+    if (h.endsWith("canva.com")) return ["Canva", "Canva"];
+    return ["Link", h.replace(/^www\./, "")];
+  }
+  const LINK_SVG = '<svg viewBox="0 0 16 16" width="13" height="13" aria-hidden="true" fill="none" stroke="currentColor" stroke-width="1.4" stroke-linecap="round"><path d="M6.5 9.5l3-3"/><path d="M7.2 4.6l1.2-1.2a2.6 2.6 0 013.7 3.7l-1.2 1.2"/><path d="M8.8 11.4l-1.2 1.2a2.6 2.6 0 01-3.7-3.7l1.2-1.2"/></svg>';
+  const toggleIn = (set, id) => { set.has(id) ? set.delete(id) : set.add(id); };
+
+  function taskRow(t, showDate) {
+    const li = el("li", "task" + (t.done ? " done" : ""));
+    li.dataset.id = t.id;
+    const grip = el("button", "grip", "⋮⋮"); grip.type = "button";
+    grip.setAttribute("aria-label", "移動：" + t.title + "（拖曳，或用上下鍵）");
+    grip.addEventListener("pointerdown", (e) => startDrag(e, t, li, grip));
+    grip.addEventListener("keydown", (e) => keyMove(e, t, li));
+    const cb = el("input", "check"); cb.type = "checkbox"; cb.checked = !!t.done; cb.id = "cb-" + t.id;
+    cb.setAttribute("aria-label", "完成：" + t.title);
+    cb.addEventListener("change", () => {
+      const cur = latest(t), done = cb.checked;
+      save(t.id, { ...strip(cur), done, doneAt: done ? Date.now() : null }).catch(showError);
+      if (done) toast("已完成「" + cur.title + "」", () => save(t.id, { ...strip(latest(t)), done: false, doneAt: null }));
+    });
+    const body = el("div", "body");
+    const tt = el("button", "t-title", t.title); tt.type = "button";
+    tt.addEventListener("click", () => openEditor(latest(t)));
+    body.append(tt);
+
+    const subs = t.subs || [];
+    const doneSubs = subs.filter((s) => s.done).length;
+    const allSubsDone = subs.length > 0 && doneSubs === subs.length;
+    const subsOpen = !allSubsDone || state.openSubs.has(t.id);
+    const linkCount = (t.links || []).filter((l) => safeUrl(l.url)).length;
+    const linksOpen = state.openLinks.has(t.id);
+    const meta = el("div", "t-meta");
+    const late = t.date && !t.done && t.date < today();
+    if (showDate && t.date) meta.append(el("span", "due" + (late ? " late" : ""), dotDate(t.date) + " " + rel(t.date)));
+    else if (late) meta.append(el("span", "due late", "逾期 " + rel(t.date)));
+    if (t.scope === "team" && t.assignee) meta.append(el("span", "who-tag" + (t.assignee === state.me.email ? " mine" : ""), nameOf(t.assignee)));
+    const c = catOf(t);
+    if (c) { const ct = el("span", "cat-tag"); ct.style.setProperty("--cc", cvar(c)); ct.append(el("span", "dot"), c.name); meta.append(ct); }
+    if (subs.length) {
+      const sp = el(allSubsDone ? "button" : "span", "sub-prog", "子事項 " + doneSubs + "/" + subs.length + (allSubsDone ? (subsOpen ? " 收合" : " 展開") : ""));
+      if (allSubsDone) { sp.type = "button"; sp.setAttribute("aria-expanded", String(subsOpen)); sp.addEventListener("click", () => { toggleIn(state.openSubs, t.id); render(); }); }
+      meta.append(sp);
+    }
+    if (linkCount) {
+      const lt = el("button", "link-toggle"); lt.type = "button";
+      lt.setAttribute("aria-expanded", String(linksOpen));
+      lt.innerHTML = LINK_SVG; lt.append(el("span", null, linkCount + " 個連結"));
+      lt.addEventListener("click", () => { toggleIn(state.openLinks, t.id); render(); });
+      meta.append(lt);
+    }
+    if (meta.childNodes.length) body.append(meta);
+    if (t.note) {
+      const n = el("div", "note" + (state.openNotes.has(t.id) ? " open" : ""), t.note);
+      n.title = "點一下展開或收合";
+      n.addEventListener("click", () => { toggleIn(state.openNotes, t.id); n.classList.toggle("open"); });
+      body.append(n);
+    }
+    if (linkCount && linksOpen) {
+      const ls = el("div", "links");
+      t.links.forEach((l) => {
+        const url = safeUrl(l.url); if (!url) return;
+        const [k, name] = kind(url);
+        const a = el("a", "link"); a.href = url; a.target = "_blank"; a.rel = "noopener noreferrer"; a.title = url;
+        a.append(el("span", "k", k), el("span", "lt", l.label || name));
+        ls.append(a);
+      });
+      body.append(ls);
+    }
+    if (subs.length && subsOpen) {
+      const ul = el("ul", "subs");
+      subs.forEach((s, i) => {
+        const row = el("li", s.done ? "done" : "");
+        const sc = el("input", "sub-check"); sc.type = "checkbox"; sc.checked = !!s.done; sc.id = "sub-" + t.id + "-" + i;
+        sc.addEventListener("change", () => {
+          const cur = latest(t);
+          save(t.id, { ...strip(cur), subs: (cur.subs || []).map((x) => x.id === s.id ? { ...x, done: sc.checked } : x) }).catch(showError);
+        });
+        const lb = el("label", null, s.text); lb.htmlFor = sc.id;
+        row.append(sc, lb); ul.append(row);
+      });
+      body.append(ul);
+    }
+    const add = el("button", "sub-add", "＋ 子事項"); add.type = "button";
+    add.addEventListener("click", () => {
+      const inp = el("input", "sub-input"); inp.type = "text"; inp.placeholder = "輸入子事項後按 Enter"; inp.setAttribute("aria-label", "新增子事項");
+      let finished = false;
+      inp.addEventListener("keydown", (e) => {
+        if (e.key === "Enter") {
+          e.preventDefault(); if (finished) return; finished = true;
+          const text = inp.value.trim();
+          if (!text) { inp.replaceWith(add); return; }
+          const cur = latest(t); state.addingSub = t.id;
+          save(t.id, { ...strip(cur), subs: (cur.subs || []).concat([{ id: uuid(), text, done: false }]) }).catch(showError);
+        }
+        if (e.key === "Escape") { e.stopPropagation(); finished = true; inp.replaceWith(add); }
+      });
+      inp.addEventListener("blur", () => { if (!finished && !inp.value.trim()) { finished = true; inp.replaceWith(add); } });
+      add.replaceWith(inp); inp.focus();
+    });
+    body.append(add);
+    li.append(grip, cb, body);
+    return li;
+  }
+  function group(items, opts) {
+    const s = el("section", "group " + (opts.cls || ""));
+    s._items = items;
+    if (opts.date !== undefined) s.dataset.date = opts.date;
+    const h = el("h2", "group-h");
+    if (opts.num) h.append(el("span", "num", opts.num));
+    h.append(el("span", "zh", opts.title));
+    if (opts.sub) h.append(el("span", "sub", opts.sub));
+    h.append(el("span", "n", String(items.length)));
+    const ul = el("ul", "tasks");
+    items.forEach((t) => ul.append(taskRow(t, opts.showDate)));
+    s.append(h, el("div", "rule"), ul);
+    return s;
+  }
+  function empty(title, text) { const d = el("div", "empty"); d.append(el("strong", null, title), el("p", null, text)); return d; }
+
+  function renderAll(list) {
+    const td = today();
+    let ts = vis().filter(matches).sort(sortTasks);
+    if (state.filter === "open") ts = ts.filter((t) => !t.done);
+    if (state.filter === "mine") ts = ts.filter((t) => !t.done && t.assignee === state.me.email);
+    if (state.filter === "done") ts = ts.filter((t) => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
+    if (!ts.length) {
+      list.append(vis().length ? empty("沒有符合的項目", "換個篩選條件或搜尋關鍵字看看。")
+        : empty(state.scope === "team" ? "團隊清單還是空的" : "還沒有任何待辦", "在上方輸入工作內容，或按「新增待辦」並貼上雲端連結。"));
+      return;
+    }
+    if (state.filter === "done") {
+      list.append(group(ts, { title: "已完成", showDate: true }));
+      list.append(el("p", "drag-hint", "已完成的事項會在打勾 14 天後自動刪除。"));
+      return;
+    }
+    const overdue = ts.filter((t) => t.date && t.date < td && !t.done);
+    if (overdue.length) list.append(group(overdue, { title: "逾期", cls: "overdue", showDate: true }));
+    const byDate = new Map();
+    ts.filter((t) => t.date && !(t.date < td && !t.done)).forEach((t) => { if (!byDate.has(t.date)) byDate.set(t.date, []); byDate.get(t.date).push(t); });
+    [...byDate.keys()].sort().forEach((d) => {
+      list.append(group(byDate.get(d), { title: rel(d), num: dotDate(d), sub: "週" + WD[parse(d).getDay()], date: d }));
+    });
+    const undated = ts.filter((t) => !t.date);
+    if (undated.length) list.append(group(undated, { title: "未排日期", date: "" }));
+  }
+
+  function renderDay(list) {
+    const td = today(), d = state.day, dt = parse(d);
+    $("dayNum").textContent = dotDate(d);
+    $("dayWd").textContent = "週" + WD[dt.getDay()] + "・" + dt.getFullYear();
+    $("dayRel").textContent = rel(d);
+    $("goToday").hidden = d === td;
+    $("dayPick").value = d;
+    const off = (dt.getDay() + 6) % 7, start = addDays(d, -off);
+    const wk = $("week"); wk.innerHTML = "";
+    const v = vis();
+    for (let i = 0; i < 7; i++) {
+      const s = addDays(start, i), x = parse(s);
+      const n = v.filter((t) => t.date === s && !t.done).length;
+      const b = el("button", (s === d ? "sel " : "") + (s === td ? "is-today " : "") + (n ? "has" : ""));
+      b.type = "button"; b.dataset.dropdate = s;
+      b.setAttribute("aria-label", fmtDay(s) + "，" + n + " 項未完成");
+      b.append(el("span", "wd", WD[x.getDay()]), el("span", "dn", String(x.getDate())), el("span", "ct"));
+      b.addEventListener("click", () => { state.day = s; render(); });
+      wk.append(b);
+    }
+    const items = v.filter((t) => t.date === d && matches(t));
+    const openItems = items.filter((t) => !t.done).sort(byOrd), doneItems = items.filter((t) => t.done).sort(byOrd);
+    if (d === td) {
+      const overdue = v.filter((t) => t.date && t.date < td && !t.done && matches(t)).sort(sortTasks);
+      if (overdue.length) list.append(group(overdue, { title: "之前逾期、尚未完成", cls: "overdue", showDate: true }));
+    }
+    if (openItems.length) list.append(group(openItems, { title: d === td ? "今天的待辦" : "當天待辦", date: d }));
+    else if (doneItems.length) list.append(empty("這天的事都完成了", "做得好。需要的話可以再新增。"));
+    else list.append(empty("這天沒有待辦", "用上方的快速新增，日期會自動帶入這一天。"));
+    if (doneItems.length) {
+      const tg = el("button", "done-toggle", "已完成 " + doneItems.length + " 項" + (state.showDoneDay ? "（收合）" : "（展開）"));
+      tg.type = "button"; tg.setAttribute("aria-expanded", String(state.showDoneDay));
+      tg.addEventListener("click", () => { state.showDoneDay = !state.showDoneDay; render(); });
+      list.append(tg);
+      if (state.showDoneDay) { const g = group(doneItems, { title: "已完成" }); g.style.marginTop = "12px"; list.append(g); }
+    }
+  }
+
+  function renderCal() {
+    const [y, m] = state.cal.split("-").map(Number);
+    $("calMonth").textContent = y + "." + pad(m);
+    const grid = $("calGrid"); grid.innerHTML = "";
+    ["一", "二", "三", "四", "五", "六", "日"].forEach((w) => grid.append(el("span", "wd", w)));
+    const first = new Date(y, m - 1, 1), start = addDays(ymd(first), -((first.getDay() + 6) % 7));
+    const open = new Set(vis().filter((t) => t.date && !t.done).map((t) => t.date));
+    const td = today();
+    for (let i = 0; i < 42; i++) {
+      const s = addDays(start, i), x = parse(s);
+      if (i >= 35 && x.getMonth() !== m - 1) break;
+      const sel = state.view === "day" && s === state.day;
+      const b = el("button", [x.getMonth() !== m - 1 ? "out" : "", open.has(s) ? "has" : "", s === td ? "is-today" : "", sel ? "sel" : ""].join(" "), String(x.getDate()));
+      b.type = "button"; b.dataset.dropdate = s; b.setAttribute("aria-label", fmtDay(s));
+      b.addEventListener("click", () => { state.day = s; setView("day"); });
+      grid.append(b);
+    }
+  }
+
+  // ---------- categories ----------
+  function fillCatSelect(sel, prefer) {
+    const keep = prefer || sel.value || "";
+    sel.innerHTML = "";
+    const none = el("option", null, "未分類"); none.value = ""; sel.append(none);
+    sortedCats().forEach((c) => { const o = el("option", null, c.name); o.value = c.id; sel.append(o); });
+    sel.value = state.cats.some((c) => c.id === keep) ? keep : "";
+  }
+  function renderCats() {
+    if (state.catFilter !== "all" && state.catFilter !== "none" && !state.cats.some((c) => c.id === state.catFilter)) state.catFilter = "all";
+    const open = vis().filter((t) => !t.done);
+    const entries = [["all", "全部分類", null, open.length]]
+      .concat(sortedCats().map((c) => [c.id, c.name, c, open.filter((t) => t.cat === c.id).length]))
+      .concat([["none", "未分類", null, open.filter((t) => !catOf(t)).length]]);
+    const side = $("sideCats"), bar = $("catBar");
+    side.innerHTML = ""; bar.innerHTML = "";
+    side.append(el("span", "lbl", "分類"));
+    entries.forEach(([key, label, c, n]) => {
+      const pressed = String(state.catFilter === key);
+      const pick = () => { state.catFilter = key; render(); };
+      [[side, null], [bar, "cat-chip"]].forEach(([box, cls]) => {
+        const b = el("button", cls); b.type = "button"; b.setAttribute("aria-pressed", pressed);
+        const d = el("span", "dot"); if (c) d.style.setProperty("--cc", cvar(c)); else if (key === "all") d.style.background = "var(--fg)";
+        b.append(d, label, el("span", "n", String(n))); b.addEventListener("click", pick); box.append(b);
+      });
+    });
+    [side, bar].forEach((box) => { const m = el("button", "text-link", "管理分類"); m.type = "button"; m.style.alignSelf = "flex-start"; m.addEventListener("click", openCats); box.append(m); });
+    fillCatSelect($("qCat"), state.catFilter !== "all" && state.catFilter !== "none" ? state.catFilter : "");
+    fillCatSelect($("edCat"));
+  }
+  let newColor = "c1";
+  const nextColor = (k) => COLORS[(COLORS.indexOf(safeColor(k)) + 1) % COLORS.length];
+  function setSwatch(btn, key) { btn.querySelector(".dot").style.setProperty("--cc", "var(--" + key + ")"); }
+  function renderCatList() {
+    const box = $("catList"); box.innerHTML = "";
+    if (!state.cats.length) box.append(el("p", "hint", "還沒有分類。在下方輸入名稱新增第一個。"));
+    sortedCats().forEach((c) => {
+      const row = el("div", "row-edit");
+      const sw = el("button", "swatch"); sw.type = "button"; sw.setAttribute("aria-label", "換顏色：" + c.name);
+      sw.append(el("span", "dot")); let color = safeColor(c.color); setSwatch(sw, color);
+      sw.addEventListener("click", () => {
+        color = nextColor(color); setSwatch(sw, color);
+        const cur = state.cats.find((x) => x.id === c.id) || c;
+        saveCat(c.id, { ...cur, color }).catch(showError);
+      });
+      const name = el("input"); name.type = "text"; name.value = c.name; name.setAttribute("aria-label", "分類名稱");
+      name.addEventListener("change", () => {
+        const v = name.value.trim(), cur = state.cats.find((x) => x.id === c.id) || c;
+        if (!v) { name.value = cur.name; return; }
+        if (v !== cur.name) saveCat(c.id, { ...cur, name: v }).catch(showError);
+      });
+      const del = el("button", "btn danger", "刪除"); del.type = "button";
+      del.addEventListener("click", () => {
+        if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = "確定刪除"; return; }
+        row.remove(); removeCat(c.id).catch(showError);
+      });
+      row.append(sw, name, del); box.append(row);
+    });
+    const used = new Set(state.cats.map((c) => c.color));
+    newColor = COLORS.find((k) => !used.has(k)) || COLORS[state.cats.length % COLORS.length];
+    setSwatch($("catNewColor"), newColor);
+  }
+  function openCats() { renderCatList(); $("catOverlay").hidden = false; $("catNewName").focus(); }
+  function closeCats() { $("catOverlay").hidden = true; }
+  $("catNewColor").addEventListener("click", () => { newColor = nextColor(newColor); setSwatch($("catNewColor"), newColor); });
+  $("catNew").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const name = $("catNewName").value.trim(); if (!name) { $("catNewName").focus(); return; }
+    $("catNewName").value = "";
+    const max = state.cats.reduce((m, c) => Math.max(m, ord(c)), 0);
+    const p = saveCat(uuid(), { name, color: newColor, order: max + 1000, createdAt: Date.now() });
+    renderCatList();
+    try { await p; } catch (err) { showError(err); }
+  });
+  $("catX").addEventListener("click", closeCats);
+  $("catOverlay").addEventListener("click", (e) => { if (e.target === $("catOverlay")) closeCats(); });
+
+  // ---------- members (admins) ----------
+  function renderMemList() {
+    const box = $("memList"); box.innerHTML = "";
+    state.members.slice().sort((a, b) => a.email.localeCompare(b.email)).forEach((m) => {
+      const row = el("div", "row-edit");
+      const left = el("span", "em", m.is_admin ? "管理員" : "成員");
+      const mid = el("div"); mid.style.minWidth = "0";
+      const name = el("input"); name.type = "text"; name.value = m.name || ""; name.placeholder = "顯示名稱"; name.setAttribute("aria-label", "顯示名稱：" + m.email);
+      name.style.width = "100%";
+      name.addEventListener("change", async () => {
+        const v = name.value.trim();
+        const res = await sb.from("members").update({ name: v }).eq("email", m.email);
+        if (res.error) showError(res.error); else { m.name = v; render(); }
+      });
+      mid.append(name, el("div", "em", m.email));
+      const del = el("button", "btn danger", "移除"); del.type = "button";
+      if (m.email === state.me.email) { del.disabled = true; del.title = "不能移除自己"; del.style.opacity = ".4"; }
+      del.addEventListener("click", async () => {
+        if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = "確定移除"; return; }
+        const res = await sb.from("members").delete().eq("email", m.email);
+        if (res.error) { showError(res.error); return; }
+        state.members = state.members.filter((x) => x.email !== m.email); renderMemList(); render();
+      });
+      row.append(left, mid, del); box.append(row);
+    });
+  }
+  function openMembers() { renderMemList(); $("memErr").hidden = true; $("memOverlay").hidden = false; $("memEmail").focus(); }
+  function closeMembers() { $("memOverlay").hidden = true; }
+  $("memNew").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = $("memEmail").value.trim().toLowerCase(), name = $("memName").value.trim();
+    if (!email) return;
+    if (state.members.some((m) => m.email === email)) { $("memErr").hidden = false; $("memErr").textContent = "這個 Email 已經在名單上。"; return; }
+    const res = await sb.from("members").insert({ email, name });
+    if (res.error) { $("memErr").hidden = false; $("memErr").textContent = "加入失敗：" + res.error.message; return; }
+    $("memErr").hidden = true; $("memEmail").value = ""; $("memName").value = "";
+    state.members.push({ email, name, is_admin: false }); renderMemList(); render();
+  });
+  $("memX").addEventListener("click", closeMembers);
+  $("memOverlay").addEventListener("click", (e) => { if (e.target === $("memOverlay")) closeMembers(); });
+
+  // ---------- moving tasks ----------
+  let drag = null;
+  function placeOrder(list, index) {
+    const prev = list[index - 1], next = list[index];
+    if (prev && next) return (ord(prev) + ord(next)) / 2;
+    if (prev) return ord(prev) + 1000;
+    if (next) return ord(next) - 1000;
+    return Date.now();
+  }
+  function moveTask(t, date, list, index) {
+    const order = placeOrder(list, index);
+    if (date === (t.date || "") && order === ord(t)) return;
+    save(t.id, { ...strip(latest(t)), date, order }).catch(showError);
+  }
+  function clearMarks() { $$(".drop-before, .drop-after, .drop-into, .drop-on").forEach((e) => e.classList.remove("drop-before", "drop-after", "drop-into", "drop-on")); }
+  // A press on the grip becomes a drag only after the pointer moves a few pixels; every way a press can end ends it.
+  function startDrag(e, t, li, grip) {
+    if (e.button !== 0 || drag) return;
+    e.preventDefault();
+    const r = li.getBoundingClientRect();
+    drag = { t, li, ghost: null, x0: e.clientX, y0: e.clientY, dx: e.clientX - r.left, dy: e.clientY - r.top, target: null };
+    try { grip.setPointerCapture(e.pointerId); } catch (err) {}
+    window.addEventListener("pointermove", onDragMove);
+    window.addEventListener("pointerup", onDragUp);
+    window.addEventListener("pointercancel", onDragCancel);
+    window.addEventListener("blur", onDragCancel);
+  }
+  function onDragMove(e) {
+    if (!drag) return;
+    const x = e.clientX, y = e.clientY, t = drag.t;
+    if (!drag.ghost) {
+      if (Math.abs(x - drag.x0) + Math.abs(y - drag.y0) < 5) return;
+      const r = drag.li.getBoundingClientRect();
+      const ghost = drag.li.cloneNode(true);
+      ghost.querySelectorAll("[id]").forEach((n) => n.removeAttribute("id"));
+      ghost.classList.add("ghost"); ghost.style.width = r.width + "px";
+      document.body.append(ghost); drag.ghost = ghost;
+      drag.li.classList.add("dragging"); document.body.classList.add("is-dragging");
+    }
+    drag.ghost.style.left = (x - drag.dx) + "px"; drag.ghost.style.top = (y - drag.dy) + "px";
+    if (y < 70) window.scrollBy(0, -14); else if (y > window.innerHeight - 90) window.scrollBy(0, 14);
+    clearMarks(); drag.target = null;
+    const hit = document.elementFromPoint(x, y); if (!hit) return;
+    const cell = hit.closest("[data-dropdate]");
+    if (cell) {
+      const list = vis().filter((o) => o.date === cell.dataset.dropdate && !o.done && o.id !== t.id).sort(byOrd);
+      cell.classList.add("drop-on");
+      drag.target = { date: cell.dataset.dropdate, list, index: list.length };
+      return;
+    }
+    const sec = hit.closest("section.group[data-date]"); if (!sec) return;
+    const items = sec._items.filter((o) => o.id !== t.id);
+    const row = hit.closest("li.task");
+    if (row && row === drag.li) return;
+    if (row && sec.contains(row)) {
+      const rr = row.getBoundingClientRect(), after = y > rr.top + rr.height / 2;
+      const idx = items.findIndex((o) => o.id === row.dataset.id);
+      row.classList.add(after ? "drop-after" : "drop-before");
+      drag.target = { date: sec.dataset.date, list: items, index: idx + (after ? 1 : 0) };
+    } else {
+      sec.classList.add("drop-into");
+      drag.target = { date: sec.dataset.date, list: items, index: items.length };
+    }
+  }
+  function endDrag(commit) {
+    if (!drag) return;
+    const { t, target, ghost, li } = drag;
+    window.removeEventListener("pointermove", onDragMove);
+    window.removeEventListener("pointerup", onDragUp);
+    window.removeEventListener("pointercancel", onDragCancel);
+    window.removeEventListener("blur", onDragCancel);
+    if (ghost) ghost.remove();
+    li.classList.remove("dragging"); document.body.classList.remove("is-dragging"); clearMarks();
+    drag = null;
+    render();
+    if (commit && ghost && target) { dismissHint(); moveTask(t, target.date, target.list, target.index); }
+  }
+  function onDragUp() { endDrag(true); }
+  function onDragCancel() { endDrag(false); }
+  function keyMove(e, t, li) {
+    if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+    const sec = li.closest("section.group[data-date]"); if (!sec) return;
+    const items = sec._items, i = items.findIndex((o) => o.id === t.id), up = e.key === "ArrowUp";
+    e.preventDefault();
+    if (up ? i <= 0 : i >= items.length - 1) return;
+    state.focusId = t.id;
+    moveTask(t, sec.dataset.date, items.filter((o) => o.id !== t.id), up ? i - 1 : i + 1);
+  }
+
+  // ---------- render ----------
+  function render() {
+    if (drag || !state.me) return;
+    const now = new Date();
+    $("nowDate").textContent = dotDate(today());
+    $("nowSub").textContent = now.getFullYear() + "・週" + WD[now.getDay()];
+    $("mDate").textContent = today().replace(/-/g, ".") + "・週" + WD[now.getDay()];
+    const team = state.scope === "team";
+    $$("[data-scope]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.scope === state.scope)));
+    $("scopeHint").textContent = team ? "大家都看得到、都能編輯" : "只有你看得到";
+    $("allVert").textContent = team ? "團隊待辦" : "我的待辦";
+    $("mineTab").hidden = !team;
+    if (!team && state.filter === "mine") state.filter = "open";
+    $("openCount").textContent = String(vis().filter((t) => !t.done).length);
+    $("dragHint").hidden = hintDismissed || vis().length < 2;
+    $("allBtn").setAttribute("aria-pressed", String(state.filter === "all"));
+    $$("[data-f]").forEach((x) => x.setAttribute("aria-pressed", String(x.dataset.f === state.filter)));
+    $$("[data-view]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.view === state.view)));
+    $("allHead").hidden = $("allBar").hidden = state.view !== "all";
+    $("dayHead").hidden = state.view !== "day";
+    if (state.view === "day") $("qDate").value = state.day;
+    const me = state.members.find((m) => m.email === state.me.email);
+    $$("[data-who]").forEach((e) => { e.textContent = (me && me.name ? me.name + "・" : "") + state.me.email; });
+    $$("[data-members]").forEach((e) => { e.hidden = !isAdmin(); });
+    renderCats();
+    const list = $("list"); list.innerHTML = "";
+    (state.view === "all" ? renderAll : renderDay)(list);
+    renderCal();
+    if (state.focusId) {
+      const g = list.querySelector('li.task[data-id="' + CSS.escape(state.focusId) + '"] .grip');
+      if (g) { g.focus(); state.focusId = null; }
+    }
+    if (state.addingSub) {
+      const a = list.querySelector('li.task[data-id="' + CSS.escape(state.addingSub) + '"] .sub-add');
+      state.addingSub = null; if (a) a.click();
+    }
+  }
+
+  // ---------- editor ----------
+  function linkRow(l = {}) {
+    const r = el("div", "link-edit");
+    const n = el("input", "ln"); n.type = "text"; n.placeholder = "名稱（選填）"; n.value = l.label || ""; n.setAttribute("aria-label", "連結名稱");
+    const u = el("input", "lu"); u.type = "text"; u.inputMode = "url"; u.placeholder = "貼上網址 https://…"; u.value = l.url || ""; u.setAttribute("aria-label", "連結網址");
+    const x = el("button", "btn", "移除"); x.type = "button"; x.addEventListener("click", () => r.remove());
+    r.append(n, u, x); return r;
+  }
+  let subSeq = 0;
+  function subRow(s = {}) {
+    const r = el("div", "sub-edit"); r.dataset.sid = s.id || uuid();
+    const c = el("input", "sub-check"); c.type = "checkbox"; c.checked = !!s.done; c.id = "edsub-" + (++subSeq); c.setAttribute("aria-label", "子事項完成");
+    const tx = el("input", "st"); tx.type = "text"; tx.value = s.text || ""; tx.placeholder = "子事項內容"; tx.setAttribute("aria-label", "子事項內容");
+    tx.addEventListener("keydown", (e) => { if (e.key !== "Enter") return; e.preventDefault(); const n = subRow(); r.after(n); n.querySelector(".st").focus(); });
+    const x = el("button", "btn", "移除"); x.type = "button"; x.addEventListener("click", () => r.remove());
+    r.append(c, tx, x); return r;
+  }
+  function fillAssignee(value) {
+    const sel = $("edAssignee"); sel.innerHTML = "";
+    const none = el("option", null, "未指定"); none.value = ""; sel.append(none);
+    state.members.slice().sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email)).forEach((m) => {
+      const o = el("option", null, (m.name || m.email) + (m.email === state.me.email ? "（我）" : "")); o.value = m.email; sel.append(o);
+    });
+    sel.value = state.members.some((m) => m.email === value) ? value : "";
+  }
+  function syncAssigneeField() { $("edAssigneeField").hidden = $("edScope").value !== "team"; }
+  function openEditor(t) {
+    state.editing = t || null;
+    $("edHead").textContent = t ? "編輯待辦" : "新增待辦";
+    $("edEn").textContent = t ? "Edit" : "New";
+    $("edTitle").value = t ? t.title : "";
+    $("edScope").value = t ? t.scope : state.scope;
+    // only the person who created a task can move it between lists
+    $("edScope").disabled = !!t && t.owner !== state.me.id;
+    fillAssignee(t ? t.assignee : "");
+    syncAssigneeField();
+    $("edDate").value = t ? (t.date || "") : (state.view === "day" ? state.day : today());
+    $("edNote").value = t ? (t.note || "") : "";
+    const fc = state.catFilter !== "all" && state.catFilter !== "none" ? state.catFilter : "";
+    const want = t ? (catOf(t) ? t.cat : "") : fc;
+    $("edCat").value = state.cats.some((c) => c.id === want) ? want : "";
+    const sb2 = $("edSubs"); sb2.innerHTML = ""; ((t && t.subs) || []).forEach((s) => sb2.append(subRow(s)));
+    const ls = $("edLinks"); ls.innerHTML = "";
+    (t && t.links && t.links.length ? t.links : [{}]).forEach((l) => ls.append(linkRow(l)));
+    $("edDelete").hidden = !t; $("edDelete").classList.remove("armed"); $("edDelete").textContent = "刪除";
+    $("edErr").hidden = true;
+    $("overlay").hidden = false; $("edTitle").focus();
+  }
+  function closeEditor() { $("overlay").hidden = true; state.editing = null; }
+  $("edScope").addEventListener("change", syncAssigneeField);
+  $("editor").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const title = $("edTitle").value.trim(); if (!title) return;
+    const links = [];
+    for (const r of $("edLinks").children) {
+      const raw = r.querySelector(".lu").value.trim(), label = r.querySelector(".ln").value.trim();
+      if (!raw) continue;
+      const url = safeUrl(raw);
+      if (!url) { $("edErr").hidden = false; $("edErr").textContent = "這個網址看起來不正確：" + raw; return; }
+      links.push({ label, url });
+    }
+    const subs = [];
+    for (const r of $("edSubs").children) {
+      const text = r.querySelector(".st").value.trim();
+      if (text) subs.push({ id: r.dataset.sid, text, done: r.querySelector(".sub-check").checked });
+    }
+    const base = state.editing ? strip(latest(state.editing)) : { done: false, doneAt: null, createdAt: Date.now(), order: Date.now() };
+    const scope = $("edScope").value;
+    const data = { ...base, scope, assignee: scope === "team" ? $("edAssignee").value : "", title, date: $("edDate").value || "",
+      cat: $("edCat").value || "", note: $("edNote").value.trim(), links, subs };
+    const id = state.editing ? state.editing.id : uuid();
+    closeEditor();
+    if (scope !== state.scope) { state.scope = scope; try { localStorage.setItem("todo.scope", scope); } catch (err) {} }
+    try { await save(id, data); } catch (err) { showError(err); }
+  });
+  $("edAddSub").addEventListener("click", () => { const r = subRow(); $("edSubs").append(r); r.querySelector(".st").focus(); });
+  $("edCancel").addEventListener("click", closeEditor);
+  $("edClose").addEventListener("click", closeEditor);
+  $("edNoDate").addEventListener("click", () => { $("edDate").value = ""; });
+  $("edAddLink").addEventListener("click", () => { const r = linkRow(); $("edLinks").append(r); r.querySelector(".lu").focus(); });
+  $("edDelete").addEventListener("click", async () => {
+    const b = $("edDelete");
+    if (!b.classList.contains("armed")) { b.classList.add("armed"); b.textContent = "再按一次確定刪除"; return; }
+    const gone = latest(state.editing); closeEditor();
+    try {
+      await remove(gone.id);
+      toast("已刪除「" + gone.title + "」", () => save(gone.id, strip(gone)));
+    } catch (err) { showError(err); }
+  });
+  $("overlay").addEventListener("click", (e) => { if (e.target === $("overlay")) closeEditor(); });
+  document.addEventListener("keydown", (e) => {
+    if (e.key !== "Escape") return;
+    if (drag) endDrag(false);
+    else if (!$("memOverlay").hidden) closeMembers();
+    else if (!$("catOverlay").hidden) closeCats();
+    else if (!$("overlay").hidden) closeEditor();
+  });
+
+  // ---------- export ----------
+  function exportCsv() {
+    const esc = (v) => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
+    const head = ["清單", "工作內容", "日期", "分類", "負責人", "狀態", "完成時間", "備註", "子事項", "連結"];
+    const rows = state.tasks.filter((t) => !expired(t)).sort(sortTasks).map((t) => [
+      t.scope === "team" ? "團隊" : "我的", t.title, t.date, (catOf(t) || {}).name || "", t.assignee ? nameOf(t.assignee) : "",
+      t.done ? "已完成" : "未完成", t.doneAt ? new Date(t.doneAt).toLocaleString("zh-TW") : "", t.note,
+      (t.subs || []).map((s) => (s.done ? "[x] " : "[ ] ") + s.text).join("\n"),
+      (t.links || []).map((l) => (l.label ? l.label + " " : "") + l.url).join("\n"),
+    ]);
+    const csv = "﻿" + [head].concat(rows).map((r) => r.map(esc).join(",")).join("\r\n");
+    const a = document.createElement("a");
+    a.href = URL.createObjectURL(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    a.download = "工作待辦-" + today() + ".csv";
+    document.body.append(a); a.click(); a.remove();
+    setTimeout(() => URL.revokeObjectURL(a.href), 2000);
+  }
+
+  // ---------- controls ----------
+  function setView(v) { state.view = v; try { localStorage.setItem("todo.view", v); } catch (e) {} render(); window.scrollTo(0, 0); }
+  $$("[data-view]").forEach((b) => b.addEventListener("click", () => setView(b.dataset.view)));
+  $$("[data-scope]").forEach((b) => b.addEventListener("click", () => {
+    state.scope = b.dataset.scope; try { localStorage.setItem("todo.scope", state.scope); } catch (e) {} render();
+  }));
+  $$("[data-new]").forEach((b) => b.addEventListener("click", () => openEditor(null)));
+  $$("[data-export]").forEach((b) => b.addEventListener("click", exportCsv));
+  $$("[data-members]").forEach((b) => b.addEventListener("click", openMembers));
+  $$("[data-signout]").forEach((b) => b.addEventListener("click", async () => { await sb.auth.signOut(); location.reload(); }));
+  $$("[data-f]").forEach((b) => b.addEventListener("click", () => { state.filter = b.dataset.f; render(); }));
+  // All = every task in this list, open and done, across all categories and without a search
+  $("allBtn").addEventListener("click", () => { state.filter = "all"; state.catFilter = "all"; state.q = ""; $("search").value = ""; render(); });
+  $("hintOk").addEventListener("click", dismissHint);
+  $("search").addEventListener("input", (e) => { state.q = e.target.value.trim(); render(); });
+  const goDay = (s) => { state.day = s; state.cal = s.slice(0, 7); render(); };
+  $("prevDay").addEventListener("click", () => goDay(addDays(state.day, -1)));
+  $("nextDay").addEventListener("click", () => goDay(addDays(state.day, 1)));
+  $("goToday").addEventListener("click", () => goDay(today()));
+  $("dayPick").addEventListener("change", (e) => { if (e.target.value) goDay(e.target.value); });
+  const shiftMonth = (n) => { const [y, m] = state.cal.split("-").map(Number); state.cal = ymd(new Date(y, m - 1 + n, 1)).slice(0, 7); renderCal(); };
+  $("calPrev").addEventListener("click", () => shiftMonth(-1));
+  $("calNext").addEventListener("click", () => shiftMonth(1));
+  $("qDate").value = today();
+  $("quick").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const title = $("qTitle").value.trim(); if (!title) { $("qTitle").focus(); return; }
+    $("qTitle").value = "";
+    const now = Date.now();
+    try {
+      await save(uuid(), { scope: state.scope, assignee: "", title, date: $("qDate").value || "", cat: $("qCat").value || "",
+        note: "", links: [], subs: [], done: false, doneAt: null, createdAt: now, order: now });
+    } catch (err) { showError(err); }
+  });
+
+  // When the date changes while the page is open (overnight), move "today" along with it.
+  let lastDay = today();
+  setInterval(() => {
+    const t = today(); if (t === lastDay) return;
+    if (state.day === lastDay) state.day = t;
+    if (state.cal === lastDay.slice(0, 7)) state.cal = t.slice(0, 7);
+    lastDay = t; $("qDate").value = state.view === "day" ? state.day : t; render();
+  }, 60000);
+
+  // ---------- sign-in ----------
+  function show(id) { ["login", "denied", "loading", "appRoot"].forEach((x) => { $(x).hidden = x !== id; }); }
+  $("loginForm").addEventListener("submit", async (e) => {
+    e.preventDefault();
+    const email = $("loginEmail").value.trim().toLowerCase(); if (!email) return;
+    $("loginBtn").disabled = true;
+    const msg = $("loginMsg"); msg.hidden = false; msg.className = "msg"; msg.textContent = "寄送中…";
+    const { error } = await sb.auth.signInWithOtp({ email, options: { emailRedirectTo: location.origin + location.pathname } });
+    $("loginBtn").disabled = false;
+    if (error) { msg.className = "msg err"; msg.textContent = "寄送失敗：" + error.message + "。請稍候幾分鐘再試。"; return; }
+    msg.textContent = "已寄出登入信到 " + email + "。請打開信箱點信裡的連結（可能在垃圾郵件匣）。";
+  });
+
+  let bootedFor = null;
+  async function boot(session) {
+    if (!session) { bootedFor = null; state.me = null; show("login"); return; }
+    if (bootedFor === session.user.id) return;
+    bootedFor = session.user.id;
+    state.me = { id: session.user.id, email: (session.user.email || "").toLowerCase() };
+    show("loading");
+    try { await loadAll(); } catch (e) { show("login"); $("loginMsg").hidden = false; $("loginMsg").className = "msg err"; $("loginMsg").textContent = "載入失敗：" + e.message; return; }
+    if (!state.members.some((m) => m.email === state.me.email)) {
+      $("deniedText").textContent = "你用 " + state.me.email + " 登入，但這個 Email 不在團隊成員名單上。請聯絡管理員把你加進「成員管理」，再重新登入。";
+      show("denied"); return;
+    }
+    show("appRoot");
+    render();
+    subscribeLive();
+  }
+  sb.auth.onAuthStateChange((_event, session) => { setTimeout(() => boot(session), 0); });
+  sb.auth.getSession().then(({ data }) => boot(data.session));
+})();
+</script>
+</body>
+</html>
