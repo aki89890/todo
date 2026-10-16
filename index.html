@@ -55,12 +55,12 @@ button { cursor: pointer; }
 /* ---------- app frame ---------- */
 .app { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: 1fr; }
 /* desktop: pinned to the left edge with a slim margin; the list column takes the rest, up to a readable width */
-@media (min-width: 900px) { .app { max-width: none; margin: 0; grid-template-columns: var(--side-w, 280px) 24px minmax(0, 1240px); gap: 20px; padding-left: max(28px, env(safe-area-inset-left, 0px)); padding-right: max(40px, env(safe-area-inset-right, 0px)); } }
+@media (min-width: 900px) { .app { max-width: none; margin: 0; grid-template-columns: var(--side-w, 280px) 24px minmax(0, 1240px); gap: 20px; padding-left: max(4px, env(safe-area-inset-left, 0px)); padding-right: max(40px, env(safe-area-inset-right, 0px)); } }
 
 .side { display: none; }
 @media (min-width: 900px) {
   /* right padding + reserved scrollbar lane keep the counts clear of the scrollbar */
-  .side { display: flex; flex-direction: column; gap: 26px; position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; scrollbar-gutter: stable; padding-block: 40px 32px; padding-right: 18px; }
+  .side { display: flex; flex-direction: column; gap: 26px; position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; scrollbar-gutter: stable; padding-block: 40px 32px; padding-right: 18px; padding-left: 24px; }
 }
 /* drag handle between the side column and the list */
 .side-resize { display: none; }
@@ -220,6 +220,18 @@ ul.subs li.done label { text-decoration: line-through; color: var(--muted); }
 .cat-chip[aria-pressed="true"] { background: var(--fg); color: var(--bg); border-color: var(--fg); }
 .cat-chip[aria-pressed="true"] .n { color: var(--bg); }
 .side-cats { display: flex; flex-direction: column; gap: 2px; }
+.sc-row { display: flex; align-items: center; margin-left: -24px; position: relative; }
+.sc-row > button:last-child { flex: 1; min-width: 0; }
+.sc-grip, .sc-grip-space { flex: none; width: 24px; }
+.sc-grip { height: 26px; border: 0; background: none; padding: 0; color: var(--muted); cursor: grab; touch-action: none; font-size: 12px; letter-spacing: -3px; opacity: 0; }
+.sc-row:hover .sc-grip, .sc-grip:focus-visible { opacity: 1; }
+.sc-row.cat-dragging { opacity: .35; }
+.sc-row.drop-before::before, .sc-row.drop-after::after { content: ""; position: absolute; left: 24px; right: 0; height: 2px; background: var(--fg); }
+.sc-row.drop-before::before { top: -1px; }
+.sc-row.drop-after::after { bottom: -1px; }
+.order-btns { display: flex; gap: 4px; }
+.order-btns button { width: 30px; height: 30px; border-radius: 50%; border: 1px solid var(--line); background: none; padding: 0; font-size: 13px; }
+.order-btns button:disabled { opacity: .3; cursor: default; }
 .side-cats button { display: flex; align-items: center; gap: 10px; border: 0; background: none; padding: 4px 0; text-align: left; font-size: 14px; color: var(--muted); }
 .side-cats button .n { margin-left: auto; font-family: var(--f-latin); font-size: 13px; }
 .side-cats button[aria-pressed="true"] { color: var(--fg); font-weight: 700; }
@@ -279,6 +291,11 @@ body.is-dragging { user-select: none; cursor: grabbing; }
 .field label, .field .lbl { font-size: 12px; color: var(--muted); letter-spacing: .12em; }
 .field input, .field textarea { border: 0; border-bottom: 1px solid var(--fg); background: transparent; padding: 8px 2px; min-width: 0; width: 100%; border-radius: 0; font-size: 16px; }
 .field textarea { min-height: 72px; resize: vertical; border: 1px solid var(--line); padding: 8px 10px; font-size: 15px; }
+.people { display: flex; flex-wrap: wrap; gap: 8px; padding-top: 4px; }
+.people label { display: inline-flex; align-items: center; gap: 6px; border: 1px solid var(--line); border-radius: 999px; padding: 5px 14px; font-size: 14px; cursor: pointer; user-select: none; }
+.people input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.people label:has(input:checked) { background: var(--fg); color: var(--bg); border-color: var(--fg); }
+.people label:has(input:focus-visible) { outline: 1px solid var(--fg); outline-offset: 2px; }
 .row2 { display: grid; grid-template-columns: 1fr auto; gap: 12px; align-items: end; }
 .row-half { display: grid; grid-template-columns: 1fr 1fr; gap: 16px; }
 @media (max-width: 480px) { .row-half { grid-template-columns: 1fr; } }
@@ -358,7 +375,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     </div>
     <span class="status" data-status>已同步</span>
   </aside>
-  <div class="side-resize" id="sideResize" role="separator" aria-orientation="vertical" aria-label="調整左側欄寬度" aria-valuemin="220" aria-valuemax="480" tabindex="0" title="拖曳調整寬度，雙擊還原"></div>
+  <div class="side-resize" id="sideResize" role="separator" aria-orientation="vertical" aria-label="調整左側欄寬度" aria-valuemin="240" aria-valuemax="500" tabindex="0" title="拖曳調整寬度，雙擊還原"></div>
 
   <main class="main">
     <div class="mbar">
@@ -458,10 +475,10 @@ body.is-dragging { user-select: none; cursor: grabbing; }
         <label for="edScope">放在哪個清單</label>
         <select class="sel" id="edScope"><option value="personal">我的清單（只有我看得到）</option><option value="team">團隊清單（大家都看得到）</option></select>
       </div>
-      <div class="field" id="edAssigneeField">
-        <label for="edAssignee">負責人</label>
-        <select class="sel" id="edAssignee"></select>
-      </div>
+    </div>
+    <div class="field" id="edAssigneeField">
+      <span class="lbl">負責人（可選多位）</span>
+      <div class="people" id="edAssignees" role="group" aria-label="負責人"></div>
     </div>
     <div class="row2">
       <div class="field">
@@ -571,12 +588,12 @@ body.is-dragging { user-select: none; cursor: grabbing; }
 
   // ---------- data mapping ----------
   const fromRow = (r) => ({
-    id: r.id, scope: r.scope, owner: r.owner_id, assignee: r.assignee_email || "", title: r.title, date: r.date || "",
+    id: r.id, scope: r.scope, owner: r.owner_id, assignees: Array.isArray(r.assignees) ? r.assignees : [], title: r.title, date: r.date || "",
     cat: r.cat_id || "", note: r.note || "", links: Array.isArray(r.links) ? r.links : [], subs: Array.isArray(r.subs) ? r.subs : [],
     done: !!r.done, doneAt: r.done_at ? Date.parse(r.done_at) : null, order: r.sort, createdAt: Date.parse(r.created_at),
   });
   const toRow = (t) => ({
-    scope: t.scope, assignee_email: t.scope === "team" && t.assignee ? t.assignee : null, title: t.title, date: t.date || null,
+    scope: t.scope, assignees: t.scope === "team" ? (t.assignees || []) : [], title: t.title, date: t.date || null,
     cat_id: t.cat || null, note: t.note || "", links: t.links || [], subs: t.subs || [], done: !!t.done,
     done_at: t.done && t.doneAt ? new Date(t.doneAt).toISOString() : null, sort: ord(t),
   });
@@ -584,7 +601,9 @@ body.is-dragging { user-select: none; cursor: grabbing; }
   const byOrd = (a, b) => ord(a) - ord(b);
   const sortTasks = (a, b) => (a.date || "9999") < (b.date || "9999") ? -1 : (a.date || "9999") > (b.date || "9999") ? 1 : byOrd(a, b);
   const expired = (t) => t.done && t.doneAt && Date.now() - t.doneAt > KEEP_DONE_MS;
-  const vis = () => state.tasks.filter((t) => t.scope === state.scope && !expired(t));
+  const assignedToMe = (t) => t.scope === "team" && (t.assignees || []).includes(state.me.email);
+  // My list = my personal tasks + team tasks assigned to me. Team list = every team task.
+  const vis = () => state.tasks.filter((t) => !expired(t) && (state.scope === "team" ? t.scope === "team" : (t.scope === "personal" || assignedToMe(t))));
   const latest = (t) => state.tasks.find((x) => x.id === t.id) || t;
   const catOf = (t) => t.cat ? state.cats.find((c) => c.id === t.cat) || null : null;
   const sortedCats = () => state.cats.slice().sort(byOrd);
@@ -683,7 +702,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     if (state.catFilter !== "all" && state.catFilter !== "none" && t.cat !== state.catFilter) return false;
     if (!state.q) return true;
     const q = state.q.toLowerCase();
-    return [t.title, t.note, nameOf(t.assignee), ...(t.links || []).map((l) => (l.label || "") + " " + l.url), ...(t.subs || []).map((s) => s.text)].join(" ").toLowerCase().includes(q);
+    return [t.title, t.note, ...(t.assignees || []).map(nameOf), ...(t.links || []).map((l) => (l.label || "") + " " + l.url), ...(t.subs || []).map((s) => s.text)].join(" ").toLowerCase().includes(q);
   }
   function safeUrl(raw) {
     let s = (raw || "").trim(); if (!s) return null;
@@ -740,7 +759,10 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     const late = t.date && !t.done && t.date < today();
     if (showDate && t.date) meta.append(el("span", "due" + (late ? " late" : ""), dotDate(t.date) + " " + rel(t.date)));
     else if (late) meta.append(el("span", "due late", "逾期 " + rel(t.date)));
-    if (t.scope === "team" && t.assignee) meta.append(el("span", "who-tag" + (t.assignee === state.me.email ? " mine" : ""), nameOf(t.assignee)));
+    if (state.scope === "personal" && t.scope === "team") meta.append(el("span", "tag", "團隊"));
+    if (t.scope === "team" && (t.assignees || []).length) {
+      meta.append(el("span", "who-tag" + (assignedToMe(t) ? " mine" : ""), t.assignees.map(nameOf).join("、")));
+    }
     const c = catOf(t);
     if (c) { const ct = el("span", "cat-tag"); ct.style.setProperty("--cc", cvar(c)); ct.append(el("span", "dot"), c.name); meta.append(ct); }
     if (subs.length) {
@@ -828,7 +850,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     const td = today();
     let ts = vis().filter(matches).sort(sortTasks);
     if (state.filter === "open") ts = ts.filter((t) => !t.done);
-    if (state.filter === "mine") ts = ts.filter((t) => !t.done && t.assignee === state.me.email);
+    if (state.filter === "mine") ts = ts.filter((t) => !t.done && assignedToMe(t));
     if (state.filter === "done") ts = ts.filter((t) => t.done).sort((a, b) => (b.doneAt || 0) - (a.doneAt || 0));
     if (!ts.length) {
       list.append(vis().length ? empty("沒有符合的項目", "換個篩選條件或搜尋關鍵字看看。")
@@ -931,21 +953,90 @@ body.is-dragging { user-select: none; cursor: grabbing; }
       [[side, null], [bar, "cat-chip"]].forEach(([box, cls]) => {
         const b = el("button", cls); b.type = "button"; b.setAttribute("aria-pressed", pressed);
         const d = el("span", "dot"); if (c) d.style.setProperty("--cc", cvar(c)); else if (key === "all") d.style.background = "var(--fg)";
-        b.append(d, label, el("span", "n", String(n))); b.addEventListener("click", pick); box.append(b);
+        b.append(d, label, el("span", "n", String(n))); b.addEventListener("click", pick);
+        if (box !== side) { box.append(b); return; }
+        // sidebar rows carry a drag grip (real categories only) hanging into the left margin
+        const row = el("div", "sc-row");
+        if (c) {
+          row.dataset.cid = c.id;
+          const g = el("button", "sc-grip", "⋮⋮"); g.type = "button";
+          g.setAttribute("aria-label", "移動分類：" + c.name + "（拖曳，或用上下鍵）");
+          g.addEventListener("pointerdown", (e) => startCatDrag(e, c.id, row, g));
+          g.addEventListener("keydown", (e) => {
+            if (e.key !== "ArrowUp" && e.key !== "ArrowDown") return;
+            e.preventDefault();
+            const ids = sortedCats().map((x) => x.id), i = ids.indexOf(c.id), j = i + (e.key === "ArrowUp" ? -1 : 1);
+            if (j < 0 || j >= ids.length) return;
+            ids.splice(i, 1); ids.splice(j, 0, c.id);
+            state.focusCat = c.id; reorderCats(ids);
+          });
+          row.append(g);
+        } else row.append(el("span", "sc-grip-space"));
+        row.append(b); side.append(row);
       });
     });
     [side, bar].forEach((box) => { const m = el("button", "text-link", "管理分類"); m.type = "button"; m.style.alignSelf = "flex-start"; m.addEventListener("click", openCats); box.append(m); });
     fillCatSelect($("qCat"), state.catFilter !== "all" && state.catFilter !== "none" ? state.catFilter : "");
     fillCatSelect($("edCat"));
   }
+  // ---------- category order ----------
+  async function reorderCats(ids) {
+    const changed = [];
+    ids.forEach((id, i) => {
+      const c = state.cats.find((x) => x.id === id); if (!c) return;
+      const s = (i + 1) * 1000;
+      if (ord(c) !== s) { c.order = s; changed.push(c); }
+    });
+    if (!changed.length) return;
+    render();
+    if (!$("catOverlay").hidden) renderCatList();
+    const results = await Promise.all(changed.map((c) => sb.from("categories").update({ sort: c.order }).eq("id", c.id)));
+    const bad = results.find((r) => r.error);
+    if (bad) { showError(bad.error); scheduleReload(); }
+  }
+  let catDrag = null;
+  function startCatDrag(e, id, row, grip) {
+    if (e.button !== 0 || catDrag || drag) return;
+    e.preventDefault();
+    catDrag = { id, row, y0: e.clientY, moved: false, index: -1 };
+    try { grip.setPointerCapture(e.pointerId); } catch (err) {}
+    const marks = () => $$(".sc-row.drop-before, .sc-row.drop-after").forEach((r) => r.classList.remove("drop-before", "drop-after"));
+    const move = (ev) => {
+      if (!catDrag.moved) { if (Math.abs(ev.clientY - catDrag.y0) < 4) return; catDrag.moved = true; row.classList.add("cat-dragging"); document.body.classList.add("is-dragging"); }
+      marks();
+      const rows = [...$("sideCats").querySelectorAll(".sc-row[data-cid]")];
+      let index = rows.length;
+      for (let i = 0; i < rows.length; i++) { const r = rows[i].getBoundingClientRect(); if (ev.clientY < r.top + r.height / 2) { index = i; break; } }
+      catDrag.index = index;
+      if (index < rows.length) rows[index].classList.add("drop-before"); else rows[rows.length - 1].classList.add("drop-after");
+    };
+    const end = (commit) => () => {
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", upH);
+      window.removeEventListener("pointercancel", cancelH); window.removeEventListener("blur", cancelH);
+      marks(); row.classList.remove("cat-dragging"); document.body.classList.remove("is-dragging");
+      const d = catDrag; catDrag = null;
+      if (commit && d.moved && d.index >= 0) {
+        const ids = sortedCats().map((x) => x.id), from = ids.indexOf(d.id);
+        ids.splice(from, 1);
+        ids.splice(d.index > from ? d.index - 1 : d.index, 0, d.id);
+        reorderCats(ids);
+      }
+      render();
+    };
+    const upH = end(true), cancelH = end(false);
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", upH);
+    window.addEventListener("pointercancel", cancelH); window.addEventListener("blur", cancelH);
+  }
+
   let newColor = "c1";
   const nextColor = (k) => COLORS[(COLORS.indexOf(safeColor(k)) + 1) % COLORS.length];
   function setSwatch(btn, key) { btn.querySelector(".dot").style.setProperty("--cc", "var(--" + key + ")"); }
   function renderCatList() {
     const box = $("catList"); box.innerHTML = "";
     if (!state.cats.length) box.append(el("p", "hint", "還沒有分類。在下方輸入名稱新增第一個。"));
-    sortedCats().forEach((c) => {
-      const row = el("div", "row-edit");
+    const order = sortedCats();
+    order.forEach((c, idx) => {
+      const row = el("div", "row-edit cat");
       const sw = el("button", "swatch"); sw.type = "button"; sw.setAttribute("aria-label", "換顏色：" + c.name);
       sw.append(el("span", "dot")); let color = safeColor(c.color); setSwatch(sw, color);
       sw.addEventListener("click", () => {
@@ -964,7 +1055,18 @@ body.is-dragging { user-select: none; cursor: grabbing; }
         if (!del.classList.contains("armed")) { del.classList.add("armed"); del.textContent = "確定刪除"; return; }
         row.remove(); removeCat(c.id).catch(showError);
       });
-      row.append(sw, name, del); box.append(row);
+      // up/down buttons: the way to reorder on a phone, where the sidebar is hidden
+      const ob = el("div", "order-btns");
+      [["↑", -1, "上移"], ["↓", 1, "下移"]].forEach(([sym, dir, lab]) => {
+        const b = el("button", null, sym); b.type = "button"; b.setAttribute("aria-label", lab + "：" + c.name);
+        b.disabled = idx + dir < 0 || idx + dir >= order.length;
+        b.addEventListener("click", () => {
+          const ids = order.map((x) => x.id); ids.splice(idx, 1); ids.splice(idx + dir, 0, c.id); reorderCats(ids);
+        });
+        ob.append(b);
+      });
+      const right = el("div", "order-btns"); right.append(ob, del);
+      row.append(sw, name, right); box.append(row);
     });
     const used = new Set(state.cats.map((c) => c.color));
     newColor = COLORS.find((k) => !used.has(k)) || COLORS[state.cats.length % COLORS.length];
@@ -1117,14 +1219,14 @@ body.is-dragging { user-select: none; cursor: grabbing; }
 
   // ---------- render ----------
   function render() {
-    if (drag || !state.me) return;
+    if (drag || catDrag || !state.me) return;
     const now = new Date();
     $("nowDate").textContent = dotDate(today());
     $("nowSub").textContent = now.getFullYear() + "・週" + WD[now.getDay()];
     $("mDate").textContent = today().replace(/-/g, ".") + "・週" + WD[now.getDay()];
     const team = state.scope === "team";
     $$("[data-scope]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.scope === state.scope)));
-    $("scopeHint").textContent = team ? "大家都看得到、都能編輯" : "只有你看得到";
+    $("scopeHint").textContent = team ? "大家都看得到、都能編輯" : "你的私人事項＋指派給你的團隊事項";
     $("allVert").textContent = team ? "團隊待辦" : "我的待辦";
     $("mineTab").hidden = !team;
     if (!team && state.filter === "mine") state.filter = "open";
@@ -1140,6 +1242,10 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     $$("[data-who]").forEach((e) => { e.textContent = (me && me.name ? me.name + "・" : "") + state.me.email; });
     $$("[data-members]").forEach((e) => { e.hidden = !isAdmin(); });
     renderCats();
+    if (state.focusCat) {
+      const g = document.querySelector('.sc-row[data-cid="' + CSS.escape(state.focusCat) + '"] .sc-grip');
+      state.focusCat = null; if (g) g.focus();
+    }
     const list = $("list"); list.innerHTML = "";
     (state.view === "all" ? renderAll : renderDay)(list);
     renderCal();
@@ -1170,14 +1276,16 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     const x = el("button", "btn", "移除"); x.type = "button"; x.addEventListener("click", () => r.remove());
     r.append(c, tx, x); return r;
   }
-  function fillAssignee(value) {
-    const sel = $("edAssignee"); sel.innerHTML = "";
-    const none = el("option", null, "未指定"); none.value = ""; sel.append(none);
-    state.members.slice().sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email)).forEach((m) => {
-      const o = el("option", null, (m.name || m.email) + (m.email === state.me.email ? "（我）" : "")); o.value = m.email; sel.append(o);
+  function fillAssignees(values) {
+    const box = $("edAssignees"); box.innerHTML = "";
+    state.members.slice().sort((a, b) => (a.name || a.email).localeCompare(b.name || b.email)).forEach((m, i) => {
+      const lb = el("label");
+      const cb = el("input"); cb.type = "checkbox"; cb.value = m.email; cb.id = "edwho-" + i; cb.checked = values.includes(m.email);
+      lb.append(cb, (m.name || m.email) + (m.email === state.me.email ? "（我）" : ""));
+      box.append(lb);
     });
-    sel.value = state.members.some((m) => m.email === value) ? value : "";
   }
+  const pickedAssignees = () => [...$("edAssignees").querySelectorAll("input:checked")].map((c) => c.value);
   function syncAssigneeField() { $("edAssigneeField").hidden = $("edScope").value !== "team"; }
   function openEditor(t) {
     state.editing = t || null;
@@ -1187,7 +1295,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     $("edScope").value = t ? t.scope : state.scope;
     // only the person who created a task can move it between lists
     $("edScope").disabled = !!t && t.owner !== state.me.id;
-    fillAssignee(t ? t.assignee : "");
+    fillAssignees(t ? (t.assignees || []) : []);
     syncAssigneeField();
     $("edDate").value = t ? (t.date || "") : (state.view === "day" ? state.day : today());
     $("edNote").value = t ? (t.note || "") : "";
@@ -1221,11 +1329,13 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     }
     const base = state.editing ? strip(latest(state.editing)) : { done: false, doneAt: null, createdAt: Date.now(), order: Date.now() };
     const scope = $("edScope").value;
-    const data = { ...base, scope, assignee: scope === "team" ? $("edAssignee").value : "", title, date: $("edDate").value || "",
+    const data = { ...base, scope, assignees: scope === "team" ? pickedAssignees() : [], title, date: $("edDate").value || "",
       cat: $("edCat").value || "", note: $("edNote").value.trim(), links, subs };
     const id = state.editing ? state.editing.id : uuid();
     closeEditor();
-    if (scope !== state.scope) { state.scope = scope; try { localStorage.setItem("todo.scope", scope); } catch (err) {} }
+    // a task that leaves the list being viewed: follow it, unless it still shows here (team task assigned to me)
+    const staysVisible = state.scope === "personal" && scope === "team" && data.assignees.includes(state.me.email);
+    if (scope !== state.scope && !staysVisible) { state.scope = scope; try { localStorage.setItem("todo.scope", scope); } catch (err) {} }
     try { await save(id, data); } catch (err) { showError(err); }
   });
   $("edAddSub").addEventListener("click", () => { const r = subRow(); $("edSubs").append(r); r.querySelector(".st").focus(); });
@@ -1256,7 +1366,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     const esc = (v) => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
     const head = ["清單", "工作內容", "日期", "分類", "負責人", "狀態", "完成時間", "備註", "子事項", "連結"];
     const rows = state.tasks.filter((t) => !expired(t)).sort(sortTasks).map((t) => [
-      t.scope === "team" ? "團隊" : "我的", t.title, t.date, (catOf(t) || {}).name || "", t.assignee ? nameOf(t.assignee) : "",
+      t.scope === "team" ? "團隊" : "我的", t.title, t.date, (catOf(t) || {}).name || "", (t.assignees || []).map(nameOf).join("、"),
       t.done ? "已完成" : "未完成", t.doneAt ? new Date(t.doneAt).toLocaleString("zh-TW") : "", t.note,
       (t.subs || []).map((s) => (s.done ? "[x] " : "[ ] ") + s.text).join("\n"),
       (t.links || []).map((l) => (l.label ? l.label + " " : "") + l.url).join("\n"),
@@ -1271,7 +1381,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
 
   // ---------- resizable side column (desktop), width remembered per browser ----------
   const appEl = document.querySelector(".app"), handle = $("sideResize");
-  const SIDE_MIN = 220, SIDE_MAX = 480, SIDE_DEFAULT = 280;
+  const SIDE_MIN = 240, SIDE_MAX = 500, SIDE_DEFAULT = 300;
   function setSideW(w, persist) {
     w = Math.max(SIDE_MIN, Math.min(SIDE_MAX, Math.round(w)));
     appEl.style.setProperty("--side-w", w + "px");
@@ -1332,7 +1442,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     $("qTitle").value = "";
     const now = Date.now();
     try {
-      await save(uuid(), { scope: state.scope, assignee: "", title, date: $("qDate").value || "", cat: $("qCat").value || "",
+      await save(uuid(), { scope: state.scope, assignees: [], title, date: $("qDate").value || "", cat: $("qCat").value || "",
         note: "", links: [], subs: [], done: false, doneAt: null, createdAt: now, order: now });
     } catch (err) { showError(err); }
   });
