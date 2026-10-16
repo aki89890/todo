@@ -54,11 +54,21 @@ button { cursor: pointer; }
 
 /* ---------- app frame ---------- */
 .app { max-width: 1180px; margin: 0 auto; padding-left: max(16px, env(safe-area-inset-left, 0px)); padding-right: max(16px, env(safe-area-inset-right, 0px)); display: grid; grid-template-columns: 1fr; }
-@media (min-width: 900px) { .app { grid-template-columns: 280px minmax(0, 1fr); gap: 64px; padding-left: max(40px, env(safe-area-inset-left, 0px)); padding-right: max(40px, env(safe-area-inset-right, 0px)); } }
+@media (min-width: 900px) { .app { grid-template-columns: var(--side-w, 280px) 24px minmax(0, 1fr); gap: 20px; padding-left: max(40px, env(safe-area-inset-left, 0px)); padding-right: max(40px, env(safe-area-inset-right, 0px)); } }
 
 .side { display: none; }
 @media (min-width: 900px) {
-  .side { display: flex; flex-direction: column; gap: 26px; position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; padding-block: 40px 32px; }
+  /* right padding + reserved scrollbar lane keep the counts clear of the scrollbar */
+  .side { display: flex; flex-direction: column; gap: 26px; position: sticky; top: 0; align-self: start; max-height: 100vh; overflow-y: auto; scrollbar-gutter: stable; padding-block: 40px 32px; padding-right: 18px; }
+}
+/* drag handle between the side column and the list */
+.side-resize { display: none; }
+@media (min-width: 900px) {
+  .side-resize { display: block; position: sticky; top: 0; height: 100vh; cursor: col-resize; touch-action: none; }
+  .side-resize::after { content: ""; position: absolute; top: 40px; bottom: 32px; left: 50%; width: 1px; background: var(--line); }
+  .side-resize:hover::after, .side-resize.active::after, .side-resize:focus-visible::after { width: 2px; margin-left: -1px; background: var(--fg); }
+  .side-resize:focus-visible { outline: none; }
+  body.is-resizing { cursor: col-resize; user-select: none; }
 }
 .brand .en { display: block; font-family: var(--f-latin); font-size: 64px; line-height: .9; font-weight: 500; font-variation-settings: "opsz" 100; letter-spacing: -.01em; }
 .brand .zh { display: block; font-size: 13px; margin-top: 8px; letter-spacing: .2em; }
@@ -347,6 +357,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     </div>
     <span class="status" data-status>已同步</span>
   </aside>
+  <div class="side-resize" id="sideResize" role="separator" aria-orientation="vertical" aria-label="調整左側欄寬度" aria-valuemin="220" aria-valuemax="480" tabindex="0" title="拖曳調整寬度，雙擊還原"></div>
 
   <main class="main">
     <div class="mbar">
@@ -1256,6 +1267,39 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     document.body.append(a); a.click(); a.remove();
     setTimeout(() => URL.revokeObjectURL(a.href), 2000);
   }
+
+  // ---------- resizable side column (desktop), width remembered per browser ----------
+  const appEl = document.querySelector(".app"), handle = $("sideResize");
+  const SIDE_MIN = 220, SIDE_MAX = 480, SIDE_DEFAULT = 280;
+  function setSideW(w, persist) {
+    w = Math.max(SIDE_MIN, Math.min(SIDE_MAX, Math.round(w)));
+    appEl.style.setProperty("--side-w", w + "px");
+    handle.setAttribute("aria-valuenow", String(w));
+    if (persist) { try { localStorage.setItem("todo.sideW", String(w)); } catch (e) {} }
+    return w;
+  }
+  let sideW = SIDE_DEFAULT;
+  try { const saved = Number(localStorage.getItem("todo.sideW")); if (saved) sideW = saved; } catch (e) {}
+  sideW = setSideW(sideW, false);
+  handle.addEventListener("pointerdown", (e) => {
+    if (e.button !== 0) return;
+    e.preventDefault();
+    const sideLeft = document.querySelector(".side").getBoundingClientRect().left;
+    try { handle.setPointerCapture(e.pointerId); } catch (err) {}
+    handle.classList.add("active"); document.body.classList.add("is-resizing");
+    // pointer sits on the handle's centre: side width + 20px gap + 12px half-handle
+    const move = (ev) => { sideW = setSideW(ev.clientX - sideLeft - 32, false); };
+    const up = () => {
+      window.removeEventListener("pointermove", move); window.removeEventListener("pointerup", up); window.removeEventListener("pointercancel", up);
+      handle.classList.remove("active"); document.body.classList.remove("is-resizing");
+      setSideW(sideW, true);
+    };
+    window.addEventListener("pointermove", move); window.addEventListener("pointerup", up); window.addEventListener("pointercancel", up);
+  });
+  handle.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowLeft" || e.key === "ArrowRight") { e.preventDefault(); sideW = setSideW(sideW + (e.key === "ArrowRight" ? 16 : -16), true); }
+  });
+  handle.addEventListener("dblclick", () => { sideW = setSideW(SIDE_DEFAULT, true); });
 
   // ---------- controls ----------
   function setView(v) { state.view = v; try { localStorage.setItem("todo.view", v); } catch (e) {} render(); window.scrollTo(0, 0); }
