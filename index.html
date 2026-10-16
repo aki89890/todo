@@ -116,6 +116,13 @@ button { cursor: pointer; }
 .scope button[aria-pressed="true"] { background: var(--fg); color: var(--bg); }
 .scope-row { display: flex; align-items: center; justify-content: space-between; gap: 12px; flex-wrap: wrap; margin-top: 6px; }
 @media (min-width: 900px) { .scope-row { margin-top: 0; } }
+/* department tabs under the list switch (team list only) */
+.depts { display: flex; gap: 4px 22px; flex-wrap: wrap; align-items: baseline; margin-top: 16px; }
+.depts button { border: 0; background: none; padding: 4px 0; font-size: 14px; color: var(--muted); border-bottom: 1px solid transparent; display: inline-flex; align-items: baseline; gap: 6px; }
+.depts button .n { font-family: var(--f-latin); font-size: 13px; }
+.depts button[aria-pressed="true"] { color: var(--fg); font-weight: 700; border-bottom-color: var(--fg); }
+.dept-tag { font-size: 12px; color: var(--muted); }
+.dept-tag::before { content: "▸ "; font-size: 10px; }
 .scope-tools { display: flex; align-items: center; gap: 14px; flex-wrap: wrap; }
 
 .hero { display: flex; align-items: flex-end; gap: 18px; padding-block: 24px 20px; }
@@ -244,8 +251,8 @@ ul.subs li.done label { text-decoration: line-through; color: var(--muted); }
 .swatch .dot { width: 14px; height: 14px; }
 .new-row { display: grid; grid-template-columns: auto 1fr auto; gap: 10px; align-items: center; margin-top: 6px; }
 .new-row input { border: 0; border-bottom: 1px solid var(--fg); background: transparent; padding: 8px 2px; min-width: 0; font-size: 15px; border-radius: 0; }
-.mem-new { display: grid; grid-template-columns: 1.4fr 1fr auto; gap: 10px; align-items: center; }
-@media (max-width: 560px) { .mem-new { grid-template-columns: 1fr auto; } .mem-new input[type=email] { grid-column: 1 / -1; } }
+.mem-new { display: grid; grid-template-columns: 1.4fr 1fr auto auto; gap: 10px; align-items: center; }
+@media (max-width: 560px) { .mem-new { grid-template-columns: 1fr 1fr auto; } .mem-new input[type=email] { grid-column: 1 / -1; } }
 .mem-new input { border: 0; border-bottom: 1px solid var(--fg); background: transparent; padding: 8px 2px; min-width: 0; font-size: 15px; border-radius: 0; }
 
 li.task.dragging { opacity: .3; }
@@ -393,6 +400,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
         <button type="button" class="btn" data-export title="下載目前所有待辦（Excel 可開啟）">匯出 CSV ↓</button>
       </div>
     </div>
+    <div class="depts" id="deptBar" role="group" aria-label="部門" hidden></div>
 
     <div id="allHead">
       <div class="hero">
@@ -476,6 +484,10 @@ body.is-dragging { user-select: none; cursor: grabbing; }
         <select class="sel" id="edScope"><option value="personal">我的清單（只有我看得到）</option><option value="team">團隊清單（大家都看得到）</option></select>
       </div>
     </div>
+    <div class="field" id="edDeptField">
+      <label for="edDept">部門</label>
+      <select class="sel" id="edDept"></select>
+    </div>
     <div class="field" id="edAssigneeField">
       <span class="lbl">負責人（可選多位）</span>
       <div class="people" id="edAssignees" role="group" aria-label="負責人"></div>
@@ -540,6 +552,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     <form class="mem-new" id="memNew" autocomplete="off">
       <input type="email" id="memEmail" placeholder="同事的 Email" aria-label="同事的 Email" required>
       <input type="text" id="memName" placeholder="顯示名稱" aria-label="顯示名稱">
+      <select class="sel" id="memDept" aria-label="部門"></select>
       <button type="submit" class="pill">加入<span class="ar"></span></button>
     </form>
     <div class="err" id="memErr" hidden></div>
@@ -573,7 +586,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
   const COLORS = ["c1", "c2", "c3", "c4", "c5", "c6"];
   const KEEP_DONE_MS = 14 * 86400000;
   const state = {
-    me: null, tasks: [], cats: [], members: [],
+    me: null, tasks: [], cats: [], members: [], depts: [], deptFilter: "all",
     scope: "personal", catFilter: "all", view: "all", filter: "open", q: "",
     day: today(), cal: today().slice(0, 7), editing: null, focusId: null, addingSub: null,
     openNotes: new Set(), openSubs: new Set(), openLinks: new Set(), showDoneDay: false,
@@ -581,6 +594,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
   try {
     const v = localStorage.getItem("todo.view"); if (v === "day" || v === "all") state.view = v;
     const s = localStorage.getItem("todo.scope"); if (s === "team" || s === "personal") state.scope = s;
+    const dp = localStorage.getItem("todo.dept"); if (dp) state.deptFilter = dp;
   } catch (e) {}
   let hintDismissed = false;
   try { hintDismissed = localStorage.getItem("todo.hintSeen") === "1"; } catch (e) {}
@@ -589,12 +603,12 @@ body.is-dragging { user-select: none; cursor: grabbing; }
   // ---------- data mapping ----------
   const fromRow = (r) => ({
     id: r.id, scope: r.scope, owner: r.owner_id, assignees: Array.isArray(r.assignees) ? r.assignees : [], title: r.title, date: r.date || "",
-    cat: r.cat_id || "", note: r.note || "", links: Array.isArray(r.links) ? r.links : [], subs: Array.isArray(r.subs) ? r.subs : [],
+    cat: r.cat_id || "", dept: r.dept_id || "", note: r.note || "", links: Array.isArray(r.links) ? r.links : [], subs: Array.isArray(r.subs) ? r.subs : [],
     done: !!r.done, doneAt: r.done_at ? Date.parse(r.done_at) : null, order: r.sort, createdAt: Date.parse(r.created_at),
   });
   const toRow = (t) => ({
     scope: t.scope, assignees: t.scope === "team" ? (t.assignees || []) : [], title: t.title, date: t.date || null,
-    cat_id: t.cat || null, note: t.note || "", links: t.links || [], subs: t.subs || [], done: !!t.done,
+    cat_id: t.cat || null, dept_id: t.scope === "team" && t.dept ? t.dept : null, note: t.note || "", links: t.links || [], subs: t.subs || [], done: !!t.done,
     done_at: t.done && t.doneAt ? new Date(t.doneAt).toISOString() : null, sort: ord(t),
   });
   const ord = (t) => typeof t.order === "number" ? t.order : (t.createdAt || 0);
@@ -603,7 +617,12 @@ body.is-dragging { user-select: none; cursor: grabbing; }
   const expired = (t) => t.done && t.doneAt && Date.now() - t.doneAt > KEEP_DONE_MS;
   const assignedToMe = (t) => t.scope === "team" && (t.assignees || []).includes(state.me.email);
   // My list = my personal tasks + team tasks assigned to me. Team list = every team task.
-  const vis = () => state.tasks.filter((t) => !expired(t) && (state.scope === "team" ? t.scope === "team" : (t.scope === "personal" || assignedToMe(t))));
+  const deptOf = (t) => t.dept ? state.depts.find((d) => d.id === t.dept) || null : null;
+  const inDeptFilter = (t) => state.deptFilter === "all" ? true : state.deptFilter === "none" ? !deptOf(t) : t.dept === state.deptFilter;
+  const myDept = () => { const m = state.members.find((x) => x.email === state.me.email); return (m && m.dept_id) || ""; };
+  // the department a new team task gets: the tab being viewed, else the creator's own department
+  const defaultDept = () => (state.deptFilter !== "all" && state.deptFilter !== "none") ? state.deptFilter : myDept();
+  const vis = () => state.tasks.filter((t) => !expired(t) && (state.scope === "team" ? (t.scope === "team" && inDeptFilter(t)) : (t.scope === "personal" || assignedToMe(t))));
   const latest = (t) => state.tasks.find((x) => x.id === t.id) || t;
   const catOf = (t) => t.cat ? state.cats.find((c) => c.id === t.cat) || null : null;
   const sortedCats = () => state.cats.slice().sort(byOrd);
@@ -621,15 +640,18 @@ body.is-dragging { user-select: none; cursor: grabbing; }
 
   // ---------- loading & live updates ----------
   async function loadAll() {
-    const [t, c, m] = await Promise.all([
+    const [t, c, m, d] = await Promise.all([
       sb.from("tasks").select("*"),
       sb.from("categories").select("*"),
       sb.from("members").select("*"),
+      sb.from("departments").select("*"),
     ]);
-    if (t.error || c.error || m.error) throw (t.error || c.error || m.error);
+    if (t.error || c.error || m.error || d.error) throw (t.error || c.error || m.error || d.error);
     state.tasks = t.data.map(fromRow);
     state.cats = c.data.map((r) => ({ id: r.id, name: r.name, color: r.color, order: r.sort, createdAt: Date.parse(r.created_at) }));
     state.members = m.data;
+    state.depts = d.data.map((r) => ({ id: r.id, name: r.name, order: r.sort })).sort(byOrd);
+    if (state.deptFilter !== "all" && state.deptFilter !== "none" && !state.depts.some((x) => x.id === state.deptFilter)) state.deptFilter = "all";
   }
   let reloadTimer = null;
   function scheduleReload() {
@@ -645,6 +667,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
       .on("postgres_changes", { event: "*", schema: "public", table: "tasks" }, scheduleReload)
       .on("postgres_changes", { event: "*", schema: "public", table: "categories" }, scheduleReload)
       .on("postgres_changes", { event: "*", schema: "public", table: "members" }, scheduleReload)
+      .on("postgres_changes", { event: "*", schema: "public", table: "departments" }, scheduleReload)
       .subscribe();
     // also refresh when the page comes back into view (phones pause background tabs)
     document.addEventListener("visibilitychange", () => { if (!document.hidden) scheduleReload(); });
@@ -760,6 +783,9 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     if (showDate && t.date) meta.append(el("span", "due" + (late ? " late" : ""), dotDate(t.date) + " " + rel(t.date)));
     else if (late) meta.append(el("span", "due late", "逾期 " + rel(t.date)));
     if (state.scope === "personal" && t.scope === "team") meta.append(el("span", "tag", "團隊"));
+    // department label: hidden while a single department tab is open, since it would repeat on every row
+    const dp = deptOf(t);
+    if (dp && !(state.scope === "team" && state.deptFilter === dp.id)) meta.append(el("span", "dept-tag", dp.name));
     if (t.scope === "team" && (t.assignees || []).length) {
       meta.append(el("span", "who-tag" + (assignedToMe(t) ? " mine" : ""), t.assignees.map(nameOf).join("、")));
     }
@@ -979,6 +1005,31 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     fillCatSelect($("qCat"), state.catFilter !== "all" && state.catFilter !== "none" ? state.catFilter : "");
     fillCatSelect($("edCat"));
   }
+  // ---------- departments (team list tabs) ----------
+  function renderDepts() {
+    const bar = $("deptBar");
+    bar.hidden = state.scope !== "team";
+    if (bar.hidden) return;
+    bar.innerHTML = "";
+    const openTeam = state.tasks.filter((t) => t.scope === "team" && !t.done && !expired(t));
+    const tabs = [["all", "全部", openTeam.length]]
+      .concat(state.depts.map((d) => [d.id, d.name, openTeam.filter((t) => t.dept === d.id).length]));
+    const noDept = openTeam.filter((t) => !deptOf(t)).length;
+    if (noDept || state.deptFilter === "none") tabs.push(["none", "未分部門", noDept]);
+    tabs.forEach(([key, label, n]) => {
+      const b = el("button"); b.type = "button"; b.setAttribute("aria-pressed", String(state.deptFilter === key));
+      b.append(label, el("span", "n", String(n)));
+      b.addEventListener("click", () => { state.deptFilter = key; try { localStorage.setItem("todo.dept", key); } catch (e) {} render(); });
+      bar.append(b);
+    });
+  }
+  function fillDeptSelect(sel, value) {
+    sel.innerHTML = "";
+    const none = el("option", null, "未分部門"); none.value = ""; sel.append(none);
+    state.depts.forEach((d) => { const o = el("option", null, d.name); o.value = d.id; sel.append(o); });
+    sel.value = state.depts.some((d) => d.id === value) ? value : "";
+  }
+
   // ---------- category order ----------
   async function reorderCats(ids) {
     const changed = [];
@@ -1101,7 +1152,17 @@ body.is-dragging { user-select: none; cursor: grabbing; }
         const res = await sb.from("members").update({ name: v }).eq("email", m.email);
         if (res.error) showError(res.error); else { m.name = v; render(); }
       });
-      mid.append(name, el("div", "em", m.email));
+      const dsel = el("select", "sel"); dsel.setAttribute("aria-label", "部門：" + m.email);
+      dsel.style.padding = "4px 2px"; dsel.style.fontSize = "13px";
+      fillDeptSelect(dsel, m.dept_id || "");
+      dsel.addEventListener("change", async () => {
+        const v = dsel.value || null;
+        const res = await sb.from("members").update({ dept_id: v }).eq("email", m.email);
+        if (res.error) showError(res.error); else { m.dept_id = v; render(); }
+      });
+      const sub = el("div"); sub.style.display = "flex"; sub.style.flexWrap = "wrap"; sub.style.gap = "4px 14px"; sub.style.alignItems = "center";
+      sub.append(el("span", "em", m.email), dsel);
+      mid.append(name, sub);
       const del = el("button", "btn danger", "移除"); del.type = "button";
       if (m.email === state.me.email) { del.disabled = true; del.title = "不能移除自己"; del.style.opacity = ".4"; }
       del.addEventListener("click", async () => {
@@ -1113,17 +1174,17 @@ body.is-dragging { user-select: none; cursor: grabbing; }
       row.append(left, mid, del); box.append(row);
     });
   }
-  function openMembers() { renderMemList(); $("memErr").hidden = true; $("memOverlay").hidden = false; $("memEmail").focus(); }
+  function openMembers() { fillDeptSelect($("memDept"), ""); renderMemList(); $("memErr").hidden = true; $("memOverlay").hidden = false; $("memEmail").focus(); }
   function closeMembers() { $("memOverlay").hidden = true; }
   $("memNew").addEventListener("submit", async (e) => {
     e.preventDefault();
-    const email = $("memEmail").value.trim().toLowerCase(), name = $("memName").value.trim();
+    const email = $("memEmail").value.trim().toLowerCase(), name = $("memName").value.trim(), dept_id = $("memDept").value || null;
     if (!email) return;
     if (state.members.some((m) => m.email === email)) { $("memErr").hidden = false; $("memErr").textContent = "這個 Email 已經在名單上。"; return; }
-    const res = await sb.from("members").insert({ email, name });
+    const res = await sb.from("members").insert({ email, name, dept_id });
     if (res.error) { $("memErr").hidden = false; $("memErr").textContent = "加入失敗：" + res.error.message; return; }
     $("memErr").hidden = true; $("memEmail").value = ""; $("memName").value = "";
-    state.members.push({ email, name, is_admin: false }); renderMemList(); render();
+    state.members.push({ email, name, dept_id, is_admin: false }); renderMemList(); render();
   });
   $("memX").addEventListener("click", closeMembers);
   $("memOverlay").addEventListener("click", (e) => { if (e.target === $("memOverlay")) closeMembers(); });
@@ -1227,7 +1288,8 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     const team = state.scope === "team";
     $$("[data-scope]").forEach((b) => b.setAttribute("aria-pressed", String(b.dataset.scope === state.scope)));
     $("scopeHint").textContent = team ? "大家都看得到、都能編輯" : "你的私人事項＋指派給你的團隊事項";
-    $("allVert").textContent = team ? "團隊待辦" : "我的待辦";
+    const dSel = team && state.depts.find((d) => d.id === state.deptFilter);
+    $("allVert").textContent = !team ? "我的待辦" : dSel ? dSel.name : "團隊待辦";
     $("mineTab").hidden = !team;
     if (!team && state.filter === "mine") state.filter = "open";
     $("openCount").textContent = String(vis().filter((t) => !t.done).length);
@@ -1241,6 +1303,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     const me = state.members.find((m) => m.email === state.me.email);
     $$("[data-who]").forEach((e) => { e.textContent = (me && me.name ? me.name + "・" : "") + state.me.email; });
     $$("[data-members]").forEach((e) => { e.hidden = !isAdmin(); });
+    renderDepts();
     renderCats();
     if (state.focusCat) {
       const g = document.querySelector('.sc-row[data-cid="' + CSS.escape(state.focusCat) + '"] .sc-grip');
@@ -1286,7 +1349,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     });
   }
   const pickedAssignees = () => [...$("edAssignees").querySelectorAll("input:checked")].map((c) => c.value);
-  function syncAssigneeField() { $("edAssigneeField").hidden = $("edScope").value !== "team"; }
+  function syncAssigneeField() { const off = $("edScope").value !== "team"; $("edAssigneeField").hidden = off; $("edDeptField").hidden = off; }
   function openEditor(t) {
     state.editing = t || null;
     $("edHead").textContent = t ? "編輯待辦" : "新增待辦";
@@ -1296,6 +1359,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     // only the person who created a task can move it between lists
     $("edScope").disabled = !!t && t.owner !== state.me.id;
     fillAssignees(t ? (t.assignees || []) : []);
+    fillDeptSelect($("edDept"), t ? t.dept : defaultDept());
     syncAssigneeField();
     $("edDate").value = t ? (t.date || "") : (state.view === "day" ? state.day : today());
     $("edNote").value = t ? (t.note || "") : "";
@@ -1329,13 +1393,15 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     }
     const base = state.editing ? strip(latest(state.editing)) : { done: false, doneAt: null, createdAt: Date.now(), order: Date.now() };
     const scope = $("edScope").value;
-    const data = { ...base, scope, assignees: scope === "team" ? pickedAssignees() : [], title, date: $("edDate").value || "",
+    const data = { ...base, scope, assignees: scope === "team" ? pickedAssignees() : [], dept: scope === "team" ? $("edDept").value : "", title, date: $("edDate").value || "",
       cat: $("edCat").value || "", note: $("edNote").value.trim(), links, subs };
     const id = state.editing ? state.editing.id : uuid();
     closeEditor();
     // a task that leaves the list being viewed: follow it, unless it still shows here (team task assigned to me)
     const staysVisible = state.scope === "personal" && scope === "team" && data.assignees.includes(state.me.email);
     if (scope !== state.scope && !staysVisible) { state.scope = scope; try { localStorage.setItem("todo.scope", scope); } catch (err) {} }
+    // saved into another department than the open tab: widen to 全部 so it doesn't seem to vanish
+    if (state.scope === "team" && !inDeptFilter({ dept: data.dept })) state.deptFilter = "all";
     try { await save(id, data); } catch (err) { showError(err); }
   });
   $("edAddSub").addEventListener("click", () => { const r = subRow(); $("edSubs").append(r); r.querySelector(".st").focus(); });
@@ -1364,9 +1430,9 @@ body.is-dragging { user-select: none; cursor: grabbing; }
   // ---------- export ----------
   function exportCsv() {
     const esc = (v) => '"' + String(v == null ? "" : v).replace(/"/g, '""') + '"';
-    const head = ["清單", "工作內容", "日期", "分類", "負責人", "狀態", "完成時間", "備註", "子事項", "連結"];
+    const head = ["清單", "部門", "工作內容", "日期", "分類", "負責人", "狀態", "完成時間", "備註", "子事項", "連結"];
     const rows = state.tasks.filter((t) => !expired(t)).sort(sortTasks).map((t) => [
-      t.scope === "team" ? "團隊" : "我的", t.title, t.date, (catOf(t) || {}).name || "", (t.assignees || []).map(nameOf).join("、"),
+      t.scope === "team" ? "團隊" : "我的", (deptOf(t) || {}).name || "", t.title, t.date, (catOf(t) || {}).name || "", (t.assignees || []).map(nameOf).join("、"),
       t.done ? "已完成" : "未完成", t.doneAt ? new Date(t.doneAt).toLocaleString("zh-TW") : "", t.note,
       (t.subs || []).map((s) => (s.done ? "[x] " : "[ ] ") + s.text).join("\n"),
       (t.links || []).map((l) => (l.label ? l.label + " " : "") + l.url).join("\n"),
@@ -1442,7 +1508,7 @@ body.is-dragging { user-select: none; cursor: grabbing; }
     $("qTitle").value = "";
     const now = Date.now();
     try {
-      await save(uuid(), { scope: state.scope, assignees: [], title, date: $("qDate").value || "", cat: $("qCat").value || "",
+      await save(uuid(), { scope: state.scope, assignees: [], dept: state.scope === "team" ? defaultDept() : "", title, date: $("qDate").value || "", cat: $("qCat").value || "",
         note: "", links: [], subs: [], done: false, doneAt: null, createdAt: now, order: now });
     } catch (err) { showError(err); }
   });
